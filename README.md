@@ -1,2 +1,1 @@
-# alea-llm-client
-ALEA LLM client interface
+# ALEA LLM Client
