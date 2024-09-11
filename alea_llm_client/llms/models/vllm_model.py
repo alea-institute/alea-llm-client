@@ -1,205 +1,145 @@
 """VLLM model implementation for the LLM.
 
-This module provides an implementation of the BaseAIModel for VLLM's OpenAI-compatible
-API. It includes classes and methods for both synchronous and asynchronous chat
-and JSON completions using OpenAI's language models.
+This module provides an implementation of the BaseAIModel for OpenAI-compatible
+VLLM API. It includes classes and methods for both synchronous and asynchronous
+chat and JSON completions using OpenAI's language models.
 """
+
+import hashlib
 
 # Standard library imports
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-# packages
 from pydantic import BaseModel
 
-# Local imports
-from alea_llm_client.llms.models import OpenAIModel
-from alea_llm_client.llms.models.base_ai_model import JSONModelResponse
+# project imports
+from alea_llm_client.core.logging import LoggerMixin
+from alea_llm_client.llms.models.base_ai_model import (
+    JSONModelResponse,
+)
+from alea_llm_client.llms.models.openai_compatible_model import OpenAICompatibleModel
 
-
+DEFAULT_ENDPOINT = "http://localhost:8000/"
 DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "vllm"
+DEFAULT_KEY_PATH = Path.home() / ".alea" / "keys" / "vllm"
 
 
-class VLLMModel(OpenAIModel):
+class VLLMModel(OpenAICompatibleModel, LoggerMixin):
+    """
+    VLLM model implementation.
+
+    This class implements the BaseAIModel for OpenAI-compatible VLLM API, providing
+    methods for both synchronous and asynchronous chat and JSON completions.
+    """
+
     def __init__(
         self,
+        api_key: Optional[str] = None,
         model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        endpoint: Optional[str] = "http://localhost:8000/v1",
+        endpoint: Optional[str] = DEFAULT_ENDPOINT,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
+        **kwargs: Any,
     ) -> None:
         """
-        Initialize the VLLMModel with the specified model and endpoint.
+        Initialize the VLLM model.
 
         Args:
-            model: The name of the OpenAI model to use.
+            api_key: The API key for OpenAI. If None, it will be retrieved from environment variables.
+            model: The name of the VLLM model to use.
             endpoint: The API endpoint URL (if different from default).
             formatter: A function to format input messages.
             cache_path: The path to the cache directory for storing model responses.
         """
-
-        # append to the cache path
-        cache_path = cache_path / endpoint / model
+        # add the endpoint and model hashes to the cache path
+        endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
+        model_hash = hashlib.blake2b(model.encode()).hexdigest()
+        cache_path = cache_path / endpoint_hash / model_hash
         cache_path.mkdir(parents=True, exist_ok=True)
 
-        super().__init__(
+        OpenAICompatibleModel.__init__(
+            self,
+            api_key=api_key,
             model=model,
             endpoint=endpoint,
             formatter=formatter,
             cache_path=cache_path,
-            api_key="key",
+            **kwargs,
         )
+        if endpoint is None:
+            self.logger.info(f"Initialized VLLMModel with model: {model}")
+        else:
+            self.logger.info(
+                f"Initialized VLLMModel with model: {model} and endpoint: {endpoint}"
+            )
+
+    def get_api_key(self) -> str:
+        """
+        Retrieve the API key for VLLM from the environment.
+
+        Returns:
+            The VLLM API key, which is just a placeholder.
+        """
+        # we don't need one for VLLM
+        return "key"
 
     def _json(self, *args: Any, **kwargs: Any) -> JSONModelResponse:
         """
-        Synchronous JSON completion method.
+        Perform a JSON completion with the VLLM model.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            *args: The input arguments to pass to the model.
+            **kwargs: The input keyword arguments to pass to the model.
 
         Returns:
-            The JSON response from the completion.
+            JSONModelResponse: The response from the model.
         """
-        self.logger.debug("Initiating synchronous JSON completion")
-        messages = self.format(args, kwargs)
-        kwargs.pop("response_format", None)
-
-        # check if last message doesn't end with ```json
-        if not messages[-1]["content"].endswith("\n```json\n"):
-            messages[-1]["content"] += "\n```json\n"
-
-        try:
-            # ensure that we set the ```json start and \n``` end tokens
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format={"type": "json_object"},
-                stop=["\n```\n"],
-                **kwargs,
-            )
-            return self._handle_json_response(response)
-        except Exception as e:
-            self.logger.error(f"Error in JSON completion: {str(e)}")
-            raise
+        # add response_format to kwargs and call super method
+        kwargs["response_format"] = {"type": "json_object"}
+        return super()._json(*args, **kwargs)
 
     async def _json_async(self, *args: Any, **kwargs: Any) -> JSONModelResponse:
         """
-        Asynchronous JSON completion method.
+        Perform an asynchronous JSON completion with the VLLM model.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            *args: The input arguments to pass to the model.
+            **kwargs: The input keyword arguments to pass to the model.
 
         Returns:
-            The JSON response from the completion.
+            JSONModelResponse: The response from the model.
         """
-        self.logger.debug("Initiating asynchronous JSON completion")
-        messages = self.format(args, kwargs)
-        kwargs.pop("response_format", None)
-
-        # check if last message doesn't end with ```json
-        if not messages[-1]["content"].endswith("\n```json\n"):
-            messages[-1]["content"] += "\n```json\n"
-
-        try:
-            # ensure that we set the ```json start and \n``` end tokens
-            response = await self.async_client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format={"type": "json_object"},
-                stop=["\n```\n"],
-                **kwargs,
-            )
-            return self._handle_json_response(response)
-        except Exception as e:
-            self.logger.error(f"Error in asynchronous JSON completion: {str(e)}")
-            raise
+        # add response_format to kwargs and call super method
+        kwargs["response_format"] = {"type": "json_object"}
+        return await super()._json_async(*args, **kwargs)
 
     def _pydantic(self, *args: Any, **kwargs: Any) -> BaseModel:
         """
-        Synchronous Pydantic completion method.
+        Perform a Pydantic completion with the VLLM model.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            *args: The input arguments to pass to the model.
+            **kwargs: The input keyword arguments to pass to the model.
 
         Returns:
-            The Pydantic model response from the completion.
-
-        Raises:
-            ValueError: If Pydantic model is not provided.
+            BaseModel: The response from the model.
         """
-        self.logger.debug("Initiating synchronous Pydantic completion")
-
-        # pydantic model with result field
-        pydantic_model: Optional[BaseModel] = kwargs.pop("pydantic_model", None)
-        if not pydantic_model:
-            raise ValueError("Pydantic model not provided for Pydantic completion.")
-
-        # get the response
-        messages = self.format(args, kwargs)
-        kwargs.pop("response_format", None)
-
-        # check if last message doesn't end with ```json
-        if not messages[-1]["content"].endswith("\n```json\n"):
-            messages[-1]["content"] += "\n```json\n"
-
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format={"type": "json_object"},
-                stop=["\n```\n"],
-                **kwargs,
-            )
-            return self._handle_pydantic_response(response, pydantic_model)
-        except Exception as e:
-            self.logger.error(f"Error in JSON completion: {str(e)}")
-            raise
+        # add response_format to kwargs and call super method
+        kwargs["response_format"] = {"type": "json_object"}
+        return super()._pydantic(*args, **kwargs)
 
     async def _pydantic_async(self, *args: Any, **kwargs: Any) -> BaseModel:
         """
-        Asynchronous Pydantic completion method.
+        Perform an asynchronous Pydantic completion with the VLLM model.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            *args: The input arguments to pass to the model.
+            **kwargs: The input keyword arguments to pass to the model.
 
         Returns:
-            The Pydantic model response from the completion.
-
-        Raises:
-            ValueError: If Pydantic model is not provided.
+            BaseModel: The response from the model.
         """
-        self.logger.debug("Initiating asynchronous Pydantic completion")
-
-        # pydantic model with result field
-        pydantic_model: Optional[BaseModel] = kwargs.pop("pydantic_model", None)
-        if not pydantic_model:
-            raise ValueError("Pydantic model not provided for Pydantic completion.")
-
-        # get the response
-        messages = self.format(args, kwargs)
-        kwargs.pop("response_format", None)
-
-        # check if last message doesn't end with ```json
-        if not messages[-1]["content"].endswith("\n```json\n"):
-            messages[-1]["content"] += "\n```json\n"
-
-        try:
-            response = await self.async_client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format={"type": "json_object"},
-                stop=["\n```\n"],
-                **kwargs,
-            )
-            self.logger.debug(f"Received response: {response}")
-            return self._handle_pydantic_response(response, pydantic_model)
-        except Exception as e:
-            self.logger.error(f"Error in JSON completion: {str(e)}")
-            raise
-
-    def __str__(self) -> str:
-        return f"VLLMModel(model={self.model}, endpoint={self.endpoint})"
+        # add response_format to kwargs and call super method
+        kwargs["response_format"] = {"type": "json_object"}
+        return await super()._pydantic_async(*args, **kwargs)

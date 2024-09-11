@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "alea-llm-client"
-version = "0.1.0"
+version = "0.1.1"
 description = "ALEA LLM client abstraction library for Python"
 authors = ["ALEA Institute <hello@aleainstitute.ai>"]
 license = "MIT"
@@ -33,10 +33,9 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0.0"
-openai = "^1.43.1"
-anthropic = "^0.34.2"
-tiktoken = "^0.7.0"
+python = ">=3.9,<4.0.0"
+httpx = {version = "^0.27.2", extras = ["http2"]}
+pydantic = "^2.9.1"
 
 
 [tool.poetry.group.dev.dependencies]

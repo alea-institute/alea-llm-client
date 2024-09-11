@@ -58,8 +58,8 @@ def normalize_json_response(response: str) -> str:
         ]
         if not last_pos_list:
             raise ValueError(
-                "The cleaned response is not a valid JSON or JSONL object: %s",
-                cleaned,
+                "The cleaned response is not a valid JSON or JSONL object: %s"
+                % (cleaned,)
             )
         last_pos = max(last_pos_list)
         cleaned = cleaned[: last_pos + 1]

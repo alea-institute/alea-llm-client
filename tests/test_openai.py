@@ -206,7 +206,7 @@ async def test_cache_functionality_async(openai_model: OpenAIModel, tmp_path):
     assert len(list(tmp_path.glob("*.json.gz"))) == 1  # Check if cache file was created
 
 
-class TestPydanticModel(BaseModel):
+class ExamplePydanticModel(BaseModel):
     name: str
     age: int
 
@@ -218,11 +218,11 @@ def test_pydantic_response(openai_model: OpenAIModel):
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old.",
         },
     ]
-    response: TestPydanticModel = openai_model.pydantic(
-        messages=prompt, system="Respond in JSON.", pydantic_model=TestPydanticModel
+    response: ExamplePydanticModel = openai_model.pydantic(
+        messages=prompt, system="Respond in JSON.", pydantic_model=ExamplePydanticModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, ExamplePydanticModel)
     assert response.name == "Bob"
     assert response.age == 25
 
@@ -235,11 +235,11 @@ async def test_pydantic_async(openai_model: OpenAIModel):
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Charlie who is 35 years old.",
         },
     ]
-    response: TestPydanticModel = await openai_model.pydantic_async(
-        messages=prompt, system="Respond in JSON.", pydantic_model=TestPydanticModel
+    response: ExamplePydanticModel = await openai_model.pydantic_async(
+        messages=prompt, system="Respond in JSON.", pydantic_model=ExamplePydanticModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, ExamplePydanticModel)
     assert response.name == "Charlie"
     assert response.age == 35
 

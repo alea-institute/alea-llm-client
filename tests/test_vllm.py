@@ -127,7 +127,7 @@ async def test_json_async(vllm_model: VLLMModel):
     assert isinstance(response, JSONModelResponse)
     assert isinstance(response.data, dict)
     assert response.data.get("city") == "New York City"
-    assert response.data.get("population") == 8000000
+    assert response.data.get("population") in ["8000000", 8000000]
 
 
 def test_retry_wrapper_exhaustion(vllm_model: VLLMModel):

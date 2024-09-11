@@ -1,13 +1,21 @@
-from .models.anthropic_model import AnthropicModel
-from .models.base_ai_model import BaseAIModel, JSONModelResponse, ModelResponse
-from .models.openai_model import OpenAIModel
-from .models.vllm_model import VLLMModel
+from .models import (
+    BaseAIModel,
+    OpenAICompatibleModel,
+    VLLMModel,
+    OpenAIModel,
+    AnthropicModel,
+    ResponseType,
+    ModelResponse,
+    JSONModelResponse,
+)
 
 __all__ = [
     "BaseAIModel",
+    "OpenAICompatibleModel",
+    "VLLMModel",
     "OpenAIModel",
     "AnthropicModel",
-    "VLLMModel",
+    "ResponseType",
     "ModelResponse",
     "JSONModelResponse",
 ]

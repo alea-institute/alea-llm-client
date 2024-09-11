@@ -17,18 +17,19 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
-# Third-party imports
+# packages
 import pydantic_core
 from pydantic import BaseModel
 
+# project imports
 from alea_llm_client.core.exceptions import (
     ALEARetryExhaustedError,
     ALEAAuthenticationError,
+    ALEAModelError,
 )
-
-# Local imports
 from alea_llm_client.core.logging import LoggerMixin
 from alea_llm_client.llms.utils.json import normalize_json_response
+
 
 # Default keys to exclude from the cache key
 DEFAULT_EXCLUDE_KEYS = ("ignore_cache",)
@@ -114,6 +115,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         endpoint: Optional[str] = None,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = None,
+        ignore_cache: bool = False,
         retry_limit: int = 3,
         retry_delay: float = 1.0,
     ):
@@ -125,6 +127,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             endpoint (Optional[str]): The API endpoint URL, if applicable.
             formatter (Optional[Callable]): A function to format inputs/outputs.
             cache_path (Optional[Path]): The path to the cache directory.
+            ignore_cache (bool): Whether to ignore the cache and always make a request.
             retry_limit (int): The number of times to retry the request on failure.
             retry_delay (float): The initial delay between retries, in seconds.
         """
@@ -136,6 +139,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         self.async_client = self._initialize_async_client()
         self.formatter = formatter
         self.cache_path = cache_path
+        self.ignore_cache = ignore_cache
         self.retry_limit = retry_limit
         self.retry_delay = retry_delay
 
@@ -305,7 +309,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         for attempt in range(self.retry_limit):
             try:
                 # check the cache
-                ignore_cache = kwargs.pop("ignore_cache", None)
+                ignore_cache = kwargs.pop("ignore_cache", None) or self.ignore_cache
                 pydantic_model: Optional[BaseModel] = kwargs.get("pydantic_model", None)
                 cache_args = {
                     "response_type": response_type,
@@ -338,6 +342,9 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             except ALEAAuthenticationError as e:
                 self.logger.error(f"Authentication error: {str(e)}")
                 raise e
+            except ALEAModelError as e:
+                self.logger.error(f"Model error: {str(e)}")
+                raise e
             except Exception as e:
                 self.logger.warning(
                     f"Attempt {attempt + 1} failed: {str(e)}\n{traceback.format_exc()}"
@@ -369,7 +376,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         for attempt in range(self.retry_limit):
             try:
                 # check the cache
-                ignore_cache = kwargs.pop("ignore_cache", None)
+                ignore_cache = kwargs.pop("ignore_cache", None) or self.ignore_cache
                 pydantic_model: Optional[BaseModel] = kwargs.get("pydantic_model", None)
                 cache_args = {
                     "response_type": response_type,
@@ -400,6 +407,9 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             except ALEAAuthenticationError as e:
                 self.logger.error(f"Authentication error: {str(e)}")
                 raise e
+            except ALEAModelError as e:
+                self.logger.error(f"Model error: {str(e)}")
+                raise e
             except Exception as e:
                 self.logger.warning(
                     f"Attempt {attempt + 1} failed: {str(e)}\n{traceback.format_exc()}"
@@ -410,6 +420,71 @@ class BaseAIModel(abc.ABC, LoggerMixin):
                         f"All {self.retry_limit} retry attempts failed"
                     ) from e
             await asyncio.sleep(self.retry_delay * (2**attempt))
+
+    # complete hooks
+    def complete(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform a synchronous completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the completion.
+
+        Raises:
+            AIModelError: If there's an error during the completion process.
+        """
+        return self._retry_wrapper(self._complete, ResponseType.TEXT, *args, **kwargs)
+
+    @abc.abstractmethod
+    def _complete(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform a synchronous completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the completion.
+
+        Raises:
+            AIModelError: If there's an error during the completion process.
+        """
+        pass
+
+    async def complete_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform an asynchronous completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the completion.
+
+        Raises:
+            AIModelError: If there's an error during the asynchronous completion process.
+        """
+        return await self._retry_wrapper_async(
+            self._complete_async, ResponseType.TEXT, *args, **kwargs
+        )
+
+    @abc.abstractmethod
+    async def _complete_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform an asynchronous completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the completion.
+
+        Raises:
+            AIModelError: If there's an error during the asynchronous completion process.
+        """
+        pass
 
     def chat(self, *args: Any, **kwargs: Any) -> ModelResponse:
         """Perform a synchronous chat completion.
