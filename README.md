@@ -8,6 +8,8 @@ This is a simple, two-dependency (`httpx`, `pydantic`) LLM client for ~OpenAI AP
  * OpenAI
  * Anthropic
  * VLLM
+ * Grok
+ * Gemini (Google Vertex)
 
 ### Supported Patterns
 
@@ -129,6 +131,8 @@ classDiagram
     OpenAICompatibleModel <|-- AnthropicModel
     OpenAICompatibleModel <|-- OpenAIModel
     OpenAICompatibleModel <|-- VLLMModel
+    OpenAICompatibleModel <|-- GrokModel
+    BaseAIModel <|-- GoogleModel
 
     class BaseAIModel {
         <<abstract>>
@@ -137,6 +141,8 @@ classDiagram
     class AnthropicModel
     class OpenAIModel
     class VLLMModel
+    class GrokModel
+    class GoogleModel
 ```
 
 ### Example Call Flow
