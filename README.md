@@ -94,8 +94,7 @@ if __name__ == "__main__":
 ### Pydantic Example
 ```python
 from pydantic import BaseModel
-from alea_llm_client import AnthropicModel
-from alea_llm_client.llms.prompts.sections import format_prompt, format_instructions
+from alea_llm_client import AnthropicModel, format_prompt, format_instructions
 
 class Person(BaseModel):
     name: str
