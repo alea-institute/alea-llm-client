@@ -52,11 +52,12 @@ class VLLMModel(OpenAICompatibleModel, LoggerMixin):
             formatter: A function to format input messages.
             cache_path: The path to the cache directory for storing model responses.
         """
-        # add the endpoint and model hashes to the cache path
-        endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
-        model_hash = hashlib.blake2b(model.encode()).hexdigest()
-        cache_path = cache_path / endpoint_hash / model_hash
-        cache_path.mkdir(parents=True, exist_ok=True)
+        # add the endpoint and model hashes to the cache path if cache_path and endpoint are provided
+        if cache_path is not None and endpoint is not None:
+            endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
+            model_hash = hashlib.blake2b(model.encode()).hexdigest()
+            cache_path = cache_path / endpoint_hash / model_hash
+            cache_path.mkdir(parents=True, exist_ok=True)
 
         OpenAICompatibleModel.__init__(
             self,

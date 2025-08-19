@@ -15,7 +15,7 @@ import traceback
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, TypeVar
 
 # packages
 import pydantic_core
@@ -29,6 +29,9 @@ from alea_llm_client.core.exceptions import (
 )
 from alea_llm_client.core.logging import LoggerMixin
 from alea_llm_client.llms.utils.json import normalize_json_response
+
+# Type variable for Pydantic models
+T = TypeVar("T", bound=BaseModel)
 
 
 # Default keys to exclude from the cache key
@@ -49,12 +52,18 @@ class ModelResponse:
     Attributes:
         choices (List[str]): A list of response choices from the model.
         metadata (Dict): Additional metadata about the response.
-        text (Optional[str]): The primary text response, if applicable.
+        text (str): The primary text response from the model.
+        thinking (Optional[str]): The thinking content from Claude models, if available.
+        reasoning_tokens (Optional[int]): Number of reasoning tokens used by o-series models.
+        content_blocks (List[Dict]): Raw content blocks from the API response.
     """
 
     choices: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    text: Optional[str] = None
+    text: str = ""
+    thinking: Optional[str] = None
+    reasoning_tokens: Optional[int] = None
+    content_blocks: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the ModelResponse to a dictionary.
@@ -110,7 +119,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
 
     def __init__(
         self,
-        api_key: str,
+        api_key: Optional[str],
         model: str,
         endpoint: Optional[str] = None,
         formatter: Optional[Callable] = None,
@@ -122,7 +131,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         """Initialize the BaseAIModel.
 
         Args:
-            api_key (str): The API key for authenticating with the model service.
+            api_key (Optional[str]): The API key for authenticating with the model service.
             model (str): The specific model identifier to use.
             endpoint (Optional[str]): The API endpoint URL, if applicable.
             formatter (Optional[Callable]): A function to format inputs/outputs.
@@ -325,7 +334,12 @@ class BaseAIModel(abc.ABC, LoggerMixin):
                         elif response_type == ResponseType.JSON:
                             return JSONModelResponse(**cached_response)
                         elif response_type == ResponseType.PYDANTIC:
-                            return pydantic_model.model_validate(cached_response)
+                            if pydantic_model is not None:
+                                return pydantic_model.model_validate(cached_response)
+                            else:
+                                raise ValueError(
+                                    "pydantic_model cannot be None for PYDANTIC response type"
+                                )
                         else:
                             raise ValueError(f"Invalid return type: {response_type}")
 
@@ -392,7 +406,12 @@ class BaseAIModel(abc.ABC, LoggerMixin):
                         elif response_type == ResponseType.JSON:
                             return JSONModelResponse(**cached_response)
                         elif response_type == ResponseType.PYDANTIC:
-                            return pydantic_model.model_validate(cached_response)
+                            if pydantic_model is not None:
+                                return pydantic_model.model_validate(cached_response)
+                            else:
+                                raise ValueError(
+                                    "pydantic_model cannot be None for PYDANTIC response type"
+                                )
 
                 # call the function
                 result = await func(*args, **kwargs)
@@ -614,7 +633,83 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         """
         pass
 
-    def pydantic(self, *args: Any, **kwargs: Any) -> BaseModel:
+    def responses(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform a synchronous responses completion using OpenAI Responses API.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+                - input (str): The input text for the model.
+                - grammar (str, optional): Grammar definition for constrained output.
+                - grammar_syntax (str, optional): Grammar syntax type ("lark" or "regex"). Defaults to "lark".
+                - tools (List[Dict], optional): Custom tools to include.
+                - reasoning (Dict, optional): Reasoning configuration.
+                - Other standard parameters.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the responses completion process.
+        """
+        return self._retry_wrapper(self._responses, ResponseType.TEXT, *args, **kwargs)
+
+    @abc.abstractmethod
+    def _responses(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform a synchronous responses completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the responses completion process.
+        """
+        pass
+
+    async def responses_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform an asynchronous responses completion using OpenAI Responses API.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+                - input (str): The input text for the model.
+                - grammar (str, optional): Grammar definition for constrained output.
+                - grammar_syntax (str, optional): Grammar syntax type ("lark" or "regex"). Defaults to "lark".
+                - tools (List[Dict], optional): Custom tools to include.
+                - reasoning (Dict, optional): Reasoning configuration.
+                - Other standard parameters.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the asynchronous responses completion process.
+        """
+        return await self._retry_wrapper_async(
+            self._responses_async, ResponseType.TEXT, *args, **kwargs
+        )
+
+    @abc.abstractmethod
+    async def _responses_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform an asynchronous responses completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the asynchronous responses completion process.
+        """
+        pass
+
+    def pydantic(self, *args: Any, **kwargs: Any) -> T:
         """Perform a synchronous JSON completion with Pydantic validation.
 
         Args:
@@ -622,7 +717,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the Pydantic validation process.
@@ -632,7 +727,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         )
 
     @abc.abstractmethod
-    def _pydantic(self, *args: Any, **kwargs: Any) -> BaseModel:
+    def _pydantic(self, *args: Any, **kwargs: Any) -> T:
         """Perform a synchronous JSON completion with Pydantic validation.
 
         Args:
@@ -640,14 +735,14 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the Pydantic validation process.
         """
         pass
 
-    async def pydantic_async(self, *args: Any, **kwargs: Any) -> BaseModel:
+    async def pydantic_async(self, *args: Any, **kwargs: Any) -> T:
         """Perform an asynchronous JSON completion with Pydantic validation.
 
         Args:
@@ -655,7 +750,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the asynchronous Pydantic validation process.
@@ -665,7 +760,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         )
 
     @abc.abstractmethod
-    async def _pydantic_async(self, *args: Any, **kwargs: Any) -> BaseModel:
+    async def _pydantic_async(self, *args: Any, **kwargs: Any) -> T:
         """Perform an asynchronous JSON completion with Pydantic validation.
 
         Args:
@@ -673,7 +768,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the asynchronous Pydantic validation process.

@@ -1,4 +1,5 @@
 import pytest
+import httpx
 from typing import List, Dict
 from unittest.mock import patch
 from pydantic import BaseModel
@@ -7,8 +8,27 @@ from alea_llm_client import VLLMModel, ModelResponse, JSONModelResponse
 from alea_llm_client.core.exceptions import ALEARetryExhaustedError
 
 
+def check_vllm_server_available():
+    """Check if VLLM server is available at the default endpoint."""
+    try:
+        with httpx.Client(timeout=1.0) as client:
+            # Try to connect to the VLLM server
+            response = client.get("http://localhost:8000/health")
+            return response.status_code == 200
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError):
+        return False
+
+
+# Skip all tests in this module if VLLM server is not available
+pytestmark = pytest.mark.skipif(
+    not check_vllm_server_available(),
+    reason="VLLM server is not available at http://localhost:8000",
+)
+
+
 @pytest.fixture
 def vllm_model():
+    """Create a VLLM model instance for testing."""
     return VLLMModel()
 
 
@@ -187,7 +207,7 @@ async def test_cache_functionality_async(vllm_model: VLLMModel, tmp_path):
     assert len(list(tmp_path.glob("*.json.gz"))) == 1  # Check if cache file was created
 
 
-class TestPydanticModel(BaseModel):
+class PydanticTestModel(BaseModel):
     name: str
     age: int
 
@@ -199,11 +219,11 @@ def test_pydantic_response(vllm_model: VLLMModel):
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old.",
         },
     ]
-    response: TestPydanticModel = vllm_model.pydantic(
-        messages=prompt, system="Respond in JSON.", pydantic_model=TestPydanticModel
+    response: PydanticTestModel = vllm_model.pydantic(
+        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, PydanticTestModel)
     assert response.name == "Bob"
     assert response.age == 25
 
@@ -216,11 +236,11 @@ async def test_pydantic_async(vllm_model: VLLMModel):
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Charlie who is 35 years old.",
         },
     ]
-    response: TestPydanticModel = await vllm_model.pydantic_async(
-        messages=prompt, system="Respond in JSON.", pydantic_model=TestPydanticModel
+    response: PydanticTestModel = await vllm_model.pydantic_async(
+        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, PydanticTestModel)
     assert response.name == "Charlie"
     assert response.age == 35
 

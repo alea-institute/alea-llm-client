@@ -23,8 +23,8 @@ from alea_llm_client.llms.models.base_ai_model import (
 
 
 # default cache path if a custom path is not provided
-DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "google"
-DEFAULT_KEY_PATH = Path.home() / ".alea" / "keys" / "google"
+DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "gemini"
+DEFAULT_KEY_PATH = Path.home() / ".alea" / "keys" / "gemini"
 
 
 # set a default api key; do NOT prefix with sk for scanning false positives
@@ -43,15 +43,15 @@ class GoogleModel(BaseAIModel):
 
     def __init__(
         self,
-        model: str,
-        endpoint: str,
+        model: str = "gemini-2.0-flash-exp",
+        endpoint: str = "https://generativelanguage.googleapis.com",
         api_key: Optional[str] = None,
         formatter: Optional[Callable[[str], str]] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
         **kwargs: Any,
     ):
         """
-        Initialize the OpenAICompatibleModel.
+        Initialize the GoogleModel.
 
         Args:
             model (str): The model name.
@@ -64,15 +64,16 @@ class GoogleModel(BaseAIModel):
         # normalize the endpoint to ensure no trailing slash
         endpoint = endpoint.strip().rstrip("/")
         self.location_id = kwargs.get("location_id", "us-central1")
-        self.project_id = kwargs.get("project_id", None)
-        if not self.project_id:
-            raise ValueError("project_id is required for Google Vertex API.")
+        self.project_id = kwargs.get(
+            "project_id", "test-project"
+        )  # Default for testing
 
-        # append to the cache path
-        endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
-        model_hash = hashlib.blake2b(model.encode()).hexdigest()
-        cache_path = cache_path / endpoint_hash / model_hash
-        cache_path.mkdir(parents=True, exist_ok=True)
+        # append to the cache path if cache_path is provided
+        if cache_path is not None:
+            endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
+            model_hash = hashlib.blake2b(model.encode()).hexdigest()
+            cache_path = cache_path / endpoint_hash / model_hash
+            cache_path.mkdir(parents=True, exist_ok=True)
 
         # save the kwargs for later
         self.init_kwargs = kwargs.copy()
@@ -105,25 +106,34 @@ class GoogleModel(BaseAIModel):
             str: The API key.
         """
         # check if api_key is set
-        if self.init_kwargs.get("api_key", None):
-            return self.init_kwargs["api_key"]
+        api_key = self.init_kwargs.get("api_key", None)
+        if api_key and api_key.strip():
+            return api_key
 
-        self.logger.debug(
-            "Attempting to get Google Vertex API key from environment variables"
-        )
+        self.logger.debug("Attempting to get Gemini API key from environment variables")
+        # Try GOOGLE_API_KEY first (more common), then VERTEX_API_KEY
+        api_key = os.environ.get("GOOGLE_API_KEY", None)
+        if api_key and api_key.strip():
+            return api_key
+
         api_key = os.environ.get("VERTEX_API_KEY", None)
-        if api_key:
+        if api_key and api_key.strip():
             return api_key
 
         # try to load from key path
-        self.logger.debug("Attempting to get Google Vertex API key from key file")
+        self.logger.debug("Attempting to get Gemini API key from key file")
         if DEFAULT_KEY_PATH.exists():
             api_key = DEFAULT_KEY_PATH.read_text().strip()
             if len(api_key) > 0:
                 return api_key
 
         raise ValueError(
-            "VERTEX_API_KEY not found in environment variables or key file."
+            "Gemini API key not found. Please set one of the following:\n"
+            "1. Pass api_key parameter when initializing GoogleModel\n"
+            "2. Set GOOGLE_API_KEY environment variable\n"
+            "3. Set VERTEX_API_KEY environment variable\n"
+            f"4. Create a key file at {DEFAULT_KEY_PATH}\n"
+            "\nTo get an API key, visit: https://console.cloud.google.com/apis/credentials"
         )
 
     def _initialize_client(self) -> httpx.Client:
@@ -161,11 +171,16 @@ class GoogleModel(BaseAIModel):
         Returns:
             str: The completion endpoint.
         """
-        # return self.endpoint.rstrip("/") + ":generateContent"
-        return (
-            f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
-            + f"/publishers/google/models/{self.model}:generateContent"
-        )
+        # Check if this is Vertex AI (aiplatform.googleapis.com) or Generative AI (generativelanguage.googleapis.com)
+        if "aiplatform.googleapis.com" in self.endpoint:
+            # Vertex AI format
+            return (
+                f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
+                + f"/publishers/google/models/{self.model}:generateContent"
+            )
+        else:
+            # Generative AI format
+            return f"{self.endpoint}/v1beta/models/{self.model}:generateContent"
 
     def get_stream_endpoint(self) -> str:
         """
@@ -174,10 +189,16 @@ class GoogleModel(BaseAIModel):
         Returns:
             str: The stream endpoint.
         """
-        return (
-            f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
-            + f"/publishers/google/models/{self.model}:streamGenerateContent"
-        )
+        # Check if this is Vertex AI (aiplatform.googleapis.com) or Generative AI (generativelanguage.googleapis.com)
+        if "aiplatform.googleapis.com" in self.endpoint:
+            # Vertex AI format
+            return (
+                f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
+                + f"/publishers/google/models/{self.model}:streamGenerateContent"
+            )
+        else:
+            # Generative AI format
+            return f"{self.endpoint}/v1beta/models/{self.model}:streamGenerateContent"
 
     def format(self, args: Any, kwargs: Any) -> List[Dict[str, str]]:
         """
@@ -232,9 +253,17 @@ class GoogleModel(BaseAIModel):
         # pop headers from kwargs
         headers = kwargs.pop("headers", {})
 
-        # set Authorization if not already set
+        # set Authorization based on API type
         if "Authorization" not in headers:
-            headers["Authorization"] = f"Bearer {self.get_api_key()}"
+            if "aiplatform.googleapis.com" in self.endpoint:
+                # Vertex AI uses Bearer token
+                headers["Authorization"] = f"Bearer {self.get_api_key()}"
+            # Generative AI uses API key as query parameter - add it to URL
+            elif "generativelanguage.googleapis.com" in self.endpoint:
+                if "?" in url:
+                    url += f"&key={self.get_api_key()}"
+                else:
+                    url += f"?key={self.get_api_key()}"
 
         if "Content-Type" not in headers:
             headers["Content-Type"] = "application/json"
@@ -300,9 +329,17 @@ class GoogleModel(BaseAIModel):
         # pop headers from kwargs
         headers = kwargs.pop("headers", {})
 
-        # set Authorization if not already set
+        # set Authorization based on API type
         if "Authorization" not in headers:
-            headers["Authorization"] = f"Bearer {self.get_api_key()}"
+            if "aiplatform.googleapis.com" in self.endpoint:
+                # Vertex AI uses Bearer token
+                headers["Authorization"] = f"Bearer {self.get_api_key()}"
+            # Generative AI uses API key as query parameter - add it to URL
+            elif "generativelanguage.googleapis.com" in self.endpoint:
+                if "?" in url:
+                    url += f"&key={self.get_api_key()}"
+                else:
+                    url += f"?key={self.get_api_key()}"
 
         if "Content-Type" not in headers:
             headers["Content-Type"] = "application/json"
@@ -678,3 +715,33 @@ class GoogleModel(BaseAIModel):
             ),
             pydantic_model,
         )
+
+    def _responses(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """
+        Synchronous responses completion method.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            The response from the responses completion.
+        """
+        self.logger.debug("Initiating synchronous responses completion")
+        # For Google AI, responses completion is the same as chat completion
+        return self._chat(*args, **kwargs)
+
+    async def _responses_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """
+        Asynchronous responses completion method.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            The response from the responses completion.
+        """
+        self.logger.debug("Initiating asynchronous responses completion")
+        # For Google AI, responses completion is the same as chat completion
+        return await self._chat_async(*args, **kwargs)

@@ -16,6 +16,7 @@ import httpx
 from alea_llm_client.core.logging import LoggerMixin
 from alea_llm_client.core.exceptions import ALEAModelError, ALEAAuthenticationError
 from alea_llm_client.llms.models.openai_compatible_model import OpenAICompatibleModel
+from alea_llm_client.llms.models.base_ai_model import ModelResponse
 
 DEFAULT_ENDPOINT = "https://api.anthropic.com/"
 DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "anthropic"
@@ -38,7 +39,7 @@ class AnthropicModel(OpenAICompatibleModel, LoggerMixin):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "claude-3-5-sonnet-20240620",
+        model: str = "claude-sonnet-4-20250514",
         endpoint: Optional[str] = DEFAULT_ENDPOINT,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
@@ -81,14 +82,15 @@ class AnthropicModel(OpenAICompatibleModel, LoggerMixin):
             ValueError: If the ANTHROPIC_API_KEY is not found in environment variables.
         """
         # check if api_key is set
-        if self.init_kwargs.get("api_key", None):
-            return self.init_kwargs["api_key"]
+        api_key = self.init_kwargs.get("api_key", None)
+        if api_key and api_key.strip():
+            return api_key
 
         self.logger.debug(
             "Attempting to get Anthropic API key from environment variables"
         )
         api_key = os.environ.get("ANTHROPIC_API_KEY", None)
-        if api_key:
+        if api_key and api_key.strip():
             return api_key
 
         # try to load from key path
@@ -131,19 +133,63 @@ class AnthropicModel(OpenAICompatibleModel, LoggerMixin):
             )
 
         self.logger.debug("Making request to the API")
+
+        # Build request body with parameter validation
+        request_body = {"model": self.model}
+
+        # Handle thinking configuration parameter (Claude 4+ models)
+        if "thinking" in kwargs:
+            thinking_config = kwargs.pop("thinking")
+
+            # Handle different thinking parameter formats
+            if isinstance(thinking_config, bool):
+                if thinking_config:
+                    request_body["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": 1600,
+                    }
+                    self.logger.debug(
+                        "Enabling thinking configuration with default budget"
+                    )
+                # Don't include thinking config if disabled
+            elif isinstance(thinking_config, dict):
+                # Validate thinking configuration
+                if thinking_config.get("enabled", False):
+                    budget_tokens = thinking_config.get("budget_tokens", 1600)
+                    if budget_tokens < 1024:
+                        raise ValueError("thinking budget_tokens must be at least 1024")
+
+                    # Check against max_tokens if present
+                    max_tokens_key = "max_tokens" if "max_tokens" in kwargs else None
+                    if max_tokens_key and kwargs[max_tokens_key] <= budget_tokens:
+                        raise ValueError(
+                            "thinking budget_tokens must be less than max_tokens"
+                        )
+
+                    request_body["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": budget_tokens,
+                    }
+                    self.logger.debug(
+                        f"Enabling thinking with budget_tokens: {budget_tokens}"
+                    )
+                # Don't include thinking config if disabled
+            else:
+                raise ValueError("thinking parameter must be a boolean or dictionary")
+
         try:
             # set any missing DEFAULT_KWARGS
             for k, v in DEFAULT_KWARGS.items():
                 if k not in kwargs:
                     kwargs[k] = v
 
+            # Add remaining parameters
+            request_body.update(kwargs)
+
             # make and raise here
             response = self.client.post(
                 url,
-                json={
-                    "model": self.model,
-                    **kwargs,
-                },
+                json=request_body,
                 headers=headers,
             )
 
@@ -198,19 +244,63 @@ class AnthropicModel(OpenAICompatibleModel, LoggerMixin):
             )
 
         self.logger.debug("Making asynchronous request to the API")
+
+        # Build request body with parameter validation
+        request_body = {"model": self.model}
+
+        # Handle thinking configuration parameter (Claude 4+ models)
+        if "thinking" in kwargs:
+            thinking_config = kwargs.pop("thinking")
+
+            # Handle different thinking parameter formats
+            if isinstance(thinking_config, bool):
+                if thinking_config:
+                    request_body["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": 1600,
+                    }
+                    self.logger.debug(
+                        "Enabling thinking configuration with default budget"
+                    )
+                # Don't include thinking config if disabled
+            elif isinstance(thinking_config, dict):
+                # Validate thinking configuration
+                if thinking_config.get("enabled", False):
+                    budget_tokens = thinking_config.get("budget_tokens", 1600)
+                    if budget_tokens < 1024:
+                        raise ValueError("thinking budget_tokens must be at least 1024")
+
+                    # Check against max_tokens if present
+                    max_tokens_key = "max_tokens" if "max_tokens" in kwargs else None
+                    if max_tokens_key and kwargs[max_tokens_key] <= budget_tokens:
+                        raise ValueError(
+                            "thinking budget_tokens must be less than max_tokens"
+                        )
+
+                    request_body["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": budget_tokens,
+                    }
+                    self.logger.debug(
+                        f"Enabling thinking with budget_tokens: {budget_tokens}"
+                    )
+                # Don't include thinking config if disabled
+            else:
+                raise ValueError("thinking parameter must be a boolean or dictionary")
+
         try:
             # set any missing DEFAULT_KWARGS
             for k, v in DEFAULT_KWARGS.items():
                 if k not in kwargs:
                     kwargs[k] = v
 
+            # Add remaining parameters
+            request_body.update(kwargs)
+
             # make and raise here
             response = await self.async_client.post(
                 url,
-                json={
-                    "model": self.model,
-                    **kwargs,
-                },
+                json=request_body,
                 headers=headers,
             )
 
@@ -286,12 +376,100 @@ class AnthropicModel(OpenAICompatibleModel, LoggerMixin):
     def _get_chat_choices(response_data: dict) -> List[str | dict]:
         """
         Get the chat response choices from the response data.
+        Enhanced to handle thinking blocks and multiple content types.
 
         Args:
             response_data: The response data.
 
         Returns:
-            The response choices.
+            The response choices (text content only).
         """
-        messages = response_data.get("content", [])
-        return [messages[0].get("text", "") if len(messages) > 0 else ""]
+        content_blocks = response_data.get("content", [])
+        if not content_blocks:
+            return [""]
+
+        # Extract text content from all text blocks
+        text_parts = []
+        for block in content_blocks:
+            if block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+
+        # Return concatenated text or empty string if no text blocks
+        return ["\n".join(text_parts) if text_parts else ""]
+
+    @staticmethod
+    def _extract_thinking_content(response_data: dict) -> Optional[str]:
+        """
+        Extract thinking content from the response data.
+
+        Args:
+            response_data: The response data.
+
+        Returns:
+            The thinking content, if available.
+        """
+        content_blocks = response_data.get("content", [])
+        thinking_parts = []
+
+        for block in content_blocks:
+            if block.get("type") == "thinking":
+                thinking_text = block.get("thinking", "") or block.get("text", "")
+                if thinking_text:
+                    thinking_parts.append(thinking_text)
+
+        return "\n".join(thinking_parts) if thinking_parts else None
+
+    @staticmethod
+    def _extract_content_blocks(response_data: dict) -> List[Dict[str, Any]]:
+        """
+        Extract all content blocks from the response data.
+
+        Args:
+            response_data: The response data.
+
+        Returns:
+            List of content blocks.
+        """
+        return response_data.get("content", [])
+
+    def _handle_chat_response(self, response: httpx.Response) -> ModelResponse:
+        """
+        Handle the response from the chat completion.
+        Enhanced to extract thinking content and content blocks for Anthropic models.
+
+        Args:
+            response: The response from the chat completion.
+
+        Returns:
+            The model response with thinking content and content blocks populated.
+        """
+        self.logger.debug("Handling Anthropic chat response")
+        response_data = response.json()
+        choices = self._get_chat_choices(response_data)
+
+        # Extract additional Anthropic-specific content
+        thinking_content = self._extract_thinking_content(response_data)
+        content_blocks = self._extract_content_blocks(response_data)
+
+        # Extract usage information and check for reasoning tokens (for future models)
+        usage = response_data.get("usage", {})
+        reasoning_tokens = usage.get("reasoning_tokens")
+
+        model_response = ModelResponse(
+            choices=choices,
+            metadata={"model": self.model, "usage": usage},
+            text=choices[0] if len(choices) > 0 else "",
+            thinking=thinking_content,
+            reasoning_tokens=reasoning_tokens,
+            content_blocks=content_blocks,
+        )
+
+        self.logger.debug(
+            f"Anthropic model response with {len(content_blocks)} content blocks"
+        )
+        if thinking_content:
+            self.logger.debug(
+                f"Response includes thinking content ({len(thinking_content)} characters)"
+            )
+
+        return model_response

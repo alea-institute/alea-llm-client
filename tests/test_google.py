@@ -14,15 +14,18 @@ def google_model():
     access_token = os.environ.get("VERTEX_ACCESS_TOKEN")
     project_id = os.environ.get("VERTEX_PROJECT_ID")
     location_id = os.environ.get("VERTEX_LOCATION_ID")
-    api_endpoint = f"https://{location_id}-aiplatform.googleapis.com"
 
-    return GoogleModel(
-        model="gemini-2.0-flash-exp",
-        api_key=access_token,
-        endpoint=api_endpoint,
-        project_id=project_id,
-        location_id=location_id,
-    )
+    # Build kwargs only if values are set, otherwise use defaults
+    kwargs = {}
+    if access_token:
+        kwargs["api_key"] = access_token
+    if project_id:
+        kwargs["project_id"] = project_id
+    if location_id:
+        kwargs["location_id"] = location_id
+        kwargs["endpoint"] = f"https://{location_id}-aiplatform.googleapis.com"
+
+    return GoogleModel(model="gemini-2.0-flash-exp", **kwargs)
 
 
 def test_simple_addition(google_model: GoogleModel):
@@ -166,7 +169,7 @@ async def test_cache_functionality_async(google_model: GoogleModel, tmp_path):
     assert len(list(tmp_path.glob("*.json.gz"))) == 1  # Check if cache file was created
 
 
-class TestPydanticModel(BaseModel):
+class PydanticTestModel(BaseModel):
     name: str
     age: int
 
@@ -183,11 +186,11 @@ def test_pydantic_response(google_model: GoogleModel):
             ],
         },
     ]
-    response: TestPydanticModel = google_model.pydantic(
-        messages=prompt, pydantic_model=TestPydanticModel
+    response: PydanticTestModel = google_model.pydantic(
+        messages=prompt, pydantic_model=PydanticTestModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, PydanticTestModel)
     assert response.name == "Bob"
     assert response.age == 25
 
@@ -205,11 +208,11 @@ async def test_pydantic_async(google_model: GoogleModel):
             ],
         },
     ]
-    response: TestPydanticModel = await google_model.pydantic_async(
-        messages=prompt, pydantic_model=TestPydanticModel
+    response: PydanticTestModel = await google_model.pydantic_async(
+        messages=prompt, pydantic_model=PydanticTestModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, PydanticTestModel)
     assert response.name == "Charlie"
     assert response.age == 35
 
@@ -263,3 +266,36 @@ def test_model_response_to_json(google_model: GoogleModel):
     assert "choices" in response_json
     assert "metadata" in response_json
     assert "text" in response_json
+
+
+def test_unset_api_key():
+    from pathlib import Path
+
+    # Store original environment variables
+    original_google_key = os.environ.get("GOOGLE_API_KEY", "")
+    original_vertex_key = os.environ.get("VERTEX_API_KEY", "")
+    os.environ["GOOGLE_API_KEY"] = ""
+    os.environ["VERTEX_API_KEY"] = ""
+
+    # Temporarily rename the key file if it exists
+    key_path = Path.home() / ".alea" / "keys" / "gemini"
+    temp_path = key_path.with_suffix(".tmp")
+    key_exists = key_path.exists()
+    if key_exists:
+        key_path.rename(temp_path)
+
+    try:
+        with pytest.raises(ValueError) as exc_info:
+            GoogleModel()
+
+        # Check that the error message is helpful
+        error_msg = str(exc_info.value)
+        assert "Gemini API key not found" in error_msg
+        assert "GOOGLE_API_KEY" in error_msg
+        assert "VERTEX_API_KEY" in error_msg
+    finally:
+        # Restore the key file
+        if key_exists:
+            temp_path.rename(key_path)
+        os.environ["GOOGLE_API_KEY"] = original_google_key
+        os.environ["VERTEX_API_KEY"] = original_vertex_key

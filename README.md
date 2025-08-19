@@ -5,11 +5,11 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/alea-llm-client.svg)](https://pypi.org/project/alea-llm-client/)
 
 This is a simple, two-dependency (`httpx`, `pydantic`) LLM client for ~OpenAI APIs like:
- * OpenAI
- * Anthropic
+ * OpenAI (GPT-4, GPT-5, o-series)
+ * Anthropic (Claude 3.5, Claude 4)
+ * Google (Vertex AI, Gemini API)
+ * xAI (Grok)
  * VLLM
- * Grok
- * Gemini (Google Vertex)
 
 ### Supported Patterns
 
@@ -18,6 +18,72 @@ It provides the following patterns for all endpoints:
  * `chat` and `chat_async` -> str via `ModelResponse`
  * `json` and `json_async` -> dict via `JSONModelResponse`
  * `pydantic` and `pydantic_async` -> pydantic models
+ * `responses` and `responses_async` -> structured output with tool use, grammar constraints, and reasoning modes
+
+### Model Registry & Capabilities
+
+Version 0.2.0 introduces a comprehensive model registry with detailed capability tracking for 50+ models:
+
+```python
+from alea_llm_client.llms import (
+    get_models_with_context_window_gte,
+    filter_models,
+    compare_models,
+    get_model_details
+)
+
+# Find models with large context windows
+large_context = get_models_with_context_window_gte(1000000)
+
+# Filter by multiple criteria
+efficient = filter_models(
+    min_context=100000,
+    capabilities=["tools", "vision"],
+    tiers=["mini", "flash"],  # Can also use ModelTier.MINI, ModelTier.FLASH
+    exclude_deprecated=True
+)
+
+# Compare specific models
+comparison = compare_models(["gpt-5", "claude-sonnet-4-20250514", "gemini-2.5-pro"])
+```
+
+### Advanced Features
+
+#### Grammar Constraints (GPT-5)
+```python
+from alea_llm_client import OpenAIModel
+
+model = OpenAIModel(model="gpt-5")
+response = model.responses(
+    input="Answer yes or no: Is 2+2=4?",
+    grammar='start: "yes" | "no"',
+    grammar_syntax="lark"
+)
+```
+
+#### Thinking Mode (Claude 4+)
+```python
+from alea_llm_client import AnthropicModel
+
+model = AnthropicModel(model="claude-sonnet-4-20250514")
+response = model.chat(
+    messages=[{"role": "user", "content": "Solve this complex problem..."}],
+    thinking={"enabled": True, "budget_tokens": 2000}
+)
+print(response.thinking)  # Access thinking content
+```
+
+#### Reasoning Tokens (o-series)
+```python
+from alea_llm_client import OpenAIModel
+
+model = OpenAIModel(model="o3-mini")
+response = model.chat(
+    messages=[{"role": "user", "content": "Think through this step by step..."}],
+    max_completion_tokens=50000
+)
+print(f"Used {response.reasoning_tokens} reasoning tokens")
+```
 
 ### Default Caching
 
@@ -35,7 +101,7 @@ in compressed `.json.gz` format.  You can delete these files to clear the cache.
 Authentication is handled in the following priority order:
  * an `api_key` provided at model construction
  * a standard environment variable (e.g., `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`)
- * a key stored in `~/.alea/keys/{provider}` (e.g., openai, anthropic)
+ * a key stored in `~/.alea/keys/{provider}` (e.g., `openai`, `anthropic`, `gemini`, `grok`)
 
 ### Streaming
 

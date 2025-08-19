@@ -187,7 +187,7 @@ async def test_cache_functionality_async(grok_model: GrokModel, tmp_path):
     assert len(list(tmp_path.glob("*.json.gz"))) == 1  # Check if cache file was created
 
 
-class TestPydanticModel(BaseModel):
+class PydanticTestModel(BaseModel):
     name: str
     age: int
 
@@ -199,11 +199,11 @@ def test_pydantic_response(grok_model: GrokModel):
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old.",
         },
     ]
-    response: TestPydanticModel = grok_model.pydantic(
-        messages=prompt, system="Respond in JSON.", pydantic_model=TestPydanticModel
+    response: PydanticTestModel = grok_model.pydantic(
+        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, PydanticTestModel)
     assert response.name == "Bob"
     assert response.age == 25
 
@@ -216,11 +216,11 @@ async def test_pydantic_async(grok_model: GrokModel):
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Charlie who is 35 years old.",
         },
     ]
-    response: TestPydanticModel = await grok_model.pydantic_async(
-        messages=prompt, system="Respond in JSON.", pydantic_model=TestPydanticModel
+    response: PydanticTestModel = await grok_model.pydantic_async(
+        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
     )
 
-    assert isinstance(response, TestPydanticModel)
+    assert isinstance(response, PydanticTestModel)
     assert response.name == "Charlie"
     assert response.age == 35
 
