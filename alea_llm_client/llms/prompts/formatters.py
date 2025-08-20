@@ -43,7 +43,7 @@ def format_prompt(
     model = kwargs.pop("model")
 
     # get the token mapping for the model
-    token_mapping = TOKEN_MAPPING.get(model, None)
+    token_mapping = TOKEN_MAPPING.get(model)
     if token_mapping is None:
         raise ValueError(f"Token mapping not found for model: {model}")
 
@@ -68,14 +68,10 @@ def format_prompt(
 
     # check that we have either text or messages
     if text is not None and messages is not None:
-        raise ValueError(
-            "Upstream caller to format() must provide either 'text' or 'messages', not both."
-        )
+        raise ValueError("Upstream caller to format() must provide either 'text' or 'messages', not both.")
 
     if text is None and messages is None:
-        raise ValueError(
-            "Upstream caller to format() must provide either 'text' or 'messages'."
-        )
+        raise ValueError("Upstream caller to format() must provide either 'text' or 'messages'.")
 
     json_output = False
     formatted_prompt = token_mapping[TokenType.BEGIN_OF_TEXT]
@@ -106,15 +102,14 @@ def format_prompt(
                 f"\n\n{content}{token_mapping.get(TokenType.END_OF_TEXT)}"
             )
 
-        if messages[-1]["role"].lower() == "user" and messages[-1][
-            "content"
-        ].strip().endswith(token_mapping.get(TokenType.JSON_MARKER)):
+        if messages[-1]["role"].lower() == "user" and messages[-1]["content"].strip().endswith(
+            token_mapping.get(TokenType.JSON_MARKER)
+        ):
             json_output = True
 
     # add assistant header
     formatted_prompt += (
-        f"{token_mapping.get(TokenType.START_HEADER)}"
-        f"assistant{token_mapping.get(TokenType.END_HEADER)}\n\n"
+        f"{token_mapping.get(TokenType.START_HEADER)}assistant{token_mapping.get(TokenType.END_HEADER)}\n\n"
     )
 
     # add JSON marker if needed
@@ -132,4 +127,4 @@ def format_prompt_llama3(
     Format a model prompt for the llama3 model based on the upstream *args and **kwargs.
     """
     kwargs["model"] = "llama3"
-    return format_prompt(*args, **kwargs)
+    return format_prompt(args, kwargs)

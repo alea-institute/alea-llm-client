@@ -1,6 +1,6 @@
 [project]
 name = "alea-llm-client"
-version = "0.2.0"
+version = "0.2.3"
 description = "ALEA LLM client abstraction library for Python"
 authors = [{ name = "ALEA Institute", email = "hello@aleainstitute.ai" }]
 requires-python = ">=3.9,<4.0.0"
@@ -75,23 +75,70 @@ exclude = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.pylint]
-max-line-length = 120
-disable = [
-    "line-too-long",
-    "too-few-public-methods",
-    "no-self-argument",
-    "cyclic-import"
-]
-extension-pkg-allow-list = ["lxml"]
-ignore-patterns = ["test_.*?.py", "conftest.py"]
+[tool.ruff]
+line-length = 120
+target-version = "py39"
 
-[tool.pylint.messages_control]
-max-args = 10
-max-attributes = 15
-max-branches = 15
-max-locals = 25
-min-public-methods = 0
+[tool.ruff.lint]
+extend-select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings  
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "YTT",  # flake8-2020
+    "BLE",  # flake8-blind-except
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "T20",  # flake8-print
+    "SIM",  # flake8-simplify
+    "ARG",  # flake8-unused-arguments
+    "PTH",  # flake8-use-pathlib
+    "ERA",  # eradicate
+    "PD",   # pandas-vet
+    "PGH",  # pygrep-hooks
+    "PL",   # pylint
+    "TRY",  # tryceratops
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "T201",    # print found
+    "PGH003",  # use specific rule codes when ignoring type issues
+    "TRY003",  # avoid specifying long messages outside the exception class
+    "PLR0913", # too many arguments to function call
+    "PLR0915", # too many statements
+    "PLR2004", # magic value used in comparison
+    "PD901",   # avoid using generic names for pandas DataFrame
+    "ARG001",  # unused function argument
+    "ARG002",  # unused method argument
+    "N806",    # variable in function should be lowercase
+    # Architectural decisions for model registry system  
+    "BLE001",  # blind-except (intentional for robust fallbacks)
+    "TRY301",  # raise-within-try (defensive programming pattern)
+    "TRY401",  # verbose-log-message (detailed error context preferred)
+    "TRY300",  # try-consider-else (current structure is clearer)
+    "B904",    # raise-without-from (some exceptions are intentionally clean)
+    "PLR0912", # too-many-branches (model capability detection complexity)
+    "PLR0911", # too-many-return-statements (early returns for clarity)
+    "PLW2901", # redefined-loop-name (intentional variable reuse pattern)
+    "PLW0603", # global-statement (singleton pattern for config loader)
+    "ERA001",  # commented-out-code (keeping some template comments)
+    "SIM102",  # collapsible-if (separate conditions for readability)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "PLR2004", "ARG001", "ARG002",  # existing test ignores
+    "E501",    # long lines in test content strings
+    "TRY002",  # generic exceptions in test mocks
+    "SIM117",  # nested with statements for test clarity  
+    "B017",    # assert exceptions in pytest patterns
+]
+"alea_llm_client/llms/constants/grammar_constants.py" = [
+    "PLC0415",  # import re inside function for regex validation is fine
+]
 
 [tool.isort]
 profile = "black"

@@ -13,8 +13,8 @@ Last Updated: August 2025
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
 from enum import Enum
+from typing import Any, Optional
 
 
 class ModelStatus(str, Enum):
@@ -62,8 +62,8 @@ class DetailedCapabilities:
     max_completion_tokens: Optional[int] = None  # For O-series models
 
     # Modality support (lists)
-    input_modalities: List[str] = field(default_factory=lambda: ["text"])
-    output_modalities: List[str] = field(default_factory=lambda: ["text"])
+    input_modalities: list[str] = field(default_factory=lambda: ["text"])
+    output_modalities: list[str] = field(default_factory=lambda: ["text"])
 
     # Core capabilities (boolean)
     supports_tools: bool = False  # Function calling/tools
@@ -90,7 +90,7 @@ class DetailedCapabilities:
     thinking_budget_max: Optional[int] = None  # Max thinking tokens
 
     # Output formats (list)
-    output_formats: List[str] = field(default_factory=lambda: ["text"])
+    output_formats: list[str] = field(default_factory=lambda: ["text"])
 
     # Special requirements
     requires_max_completion_tokens: bool = False  # O-series requirement
@@ -104,7 +104,7 @@ class DetailedCapabilities:
 
 
 # Complete capability matrix for ALL models
-COMPLETE_MODEL_CAPABILITIES: Dict[str, DetailedCapabilities] = {
+COMPLETE_MODEL_CAPABILITIES: dict[str, DetailedCapabilities] = {
     # ========== OPENAI MODELS ==========
     # GPT-5 Series (Latest flagship with grammar support)
     "gpt-5": DetailedCapabilities(
@@ -1004,16 +1004,12 @@ COMPLETE_MODEL_CAPABILITIES: Dict[str, DetailedCapabilities] = {
 # Query Functions
 
 
-def get_models_with_context_window_gte(min_tokens: int) -> List[str]:
+def get_models_with_context_window_gte(min_tokens: int) -> list[str]:
     """Get all models with context window >= specified tokens."""
-    return [
-        name
-        for name, caps in COMPLETE_MODEL_CAPABILITIES.items()
-        if caps.context_window >= min_tokens
-    ]
+    return [name for name, caps in COMPLETE_MODEL_CAPABILITIES.items() if caps.context_window >= min_tokens]
 
 
-def get_models_with_capability(capability: str) -> List[str]:
+def get_models_with_capability(capability: str) -> list[str]:
     """Get all models that support a specific capability.
 
     Args:
@@ -1041,25 +1037,17 @@ def get_models_with_capability(capability: str) -> List[str]:
     if not check_fn:
         raise ValueError(f"Unknown capability: {capability}")
 
-    return [
-        name for name, caps in COMPLETE_MODEL_CAPABILITIES.items() if check_fn(caps)
-    ]
+    return [name for name, caps in COMPLETE_MODEL_CAPABILITIES.items() if check_fn(caps)]
 
 
-def get_models_by_tier(tier: ModelTier) -> List[str]:
+def get_models_by_tier(tier: ModelTier) -> list[str]:
     """Get all models of a specific tier."""
-    return [
-        name for name, caps in COMPLETE_MODEL_CAPABILITIES.items() if caps.tier == tier
-    ]
+    return [name for name, caps in COMPLETE_MODEL_CAPABILITIES.items() if caps.tier == tier]
 
 
-def get_models_by_provider(provider: str) -> List[str]:
+def get_models_by_provider(provider: str) -> list[str]:
     """Get all models from a specific provider."""
-    return [
-        name
-        for name, caps in COMPLETE_MODEL_CAPABILITIES.items()
-        if caps.provider.lower() == provider.lower()
-    ]
+    return [name for name, caps in COMPLETE_MODEL_CAPABILITIES.items() if caps.provider.lower() == provider.lower()]
 
 
 def get_model_details(model_name: str) -> Optional[DetailedCapabilities]:
@@ -1067,7 +1055,7 @@ def get_model_details(model_name: str) -> Optional[DetailedCapabilities]:
     return COMPLETE_MODEL_CAPABILITIES.get(model_name)
 
 
-def compare_models(model_names: List[str]) -> Dict[str, Dict[str, Any]]:
+def compare_models(model_names: list[str]) -> dict[str, dict[str, Any]]:
     """Compare capabilities of multiple models.
 
     Returns a comparison matrix with model names as keys.
@@ -1097,11 +1085,11 @@ def filter_models(
     min_context: Optional[int] = None,
     max_context: Optional[int] = None,
     min_output: Optional[int] = None,
-    providers: Optional[List[str]] = None,
-    tiers: Optional[List[ModelTier]] = None,
-    capabilities: Optional[List[str]] = None,
+    providers: Optional[list[str]] = None,
+    tiers: Optional[list[ModelTier]] = None,
+    capabilities: Optional[list[str]] = None,
     exclude_deprecated: bool = True,
-) -> List[str]:
+) -> list[str]:
     """Advanced filtering with multiple criteria.
 
     Args:

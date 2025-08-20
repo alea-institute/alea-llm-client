@@ -155,6 +155,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Generated documentation files (can be regenerated)
+model_comparison_table.md
+
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

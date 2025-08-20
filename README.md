@@ -22,7 +22,11 @@ It provides the following patterns for all endpoints:
 
 ### Model Registry & Capabilities
 
-Version 0.2.0 introduces a comprehensive model registry with detailed capability tracking for 50+ models:
+Version 0.2.1 introduces a comprehensive model registry with detailed capability tracking for 97 real models sourced from live API calls:
+- **OpenAI**: 72 models (GPT-4, GPT-5, o-series, computer-use, realtime, audio models)
+- **Anthropic**: 9 models (Claude 3.5, Claude 4, various tiers and dates)
+- **Google**: 7 models (Gemini 1.5, Gemini 2.0, flash and pro variants)
+- **xAI**: 9 models (Grok 2, Grok 3, with vision support)
 
 ```python
 from alea_llm_client.llms import (
@@ -46,6 +50,13 @@ efficient = filter_models(
 # Compare specific models
 comparison = compare_models(["gpt-5", "claude-sonnet-4-20250514", "gemini-2.5-pro"])
 ```
+
+#### Dynamic Model Configuration
+The model registry is powered by a dynamic JSON configuration system that automatically updates from live API calls:
+- **Real API Data**: All 97 models are discovered and configured from actual provider APIs
+- **Automatic Updates**: Model configurations stay current with provider releases
+- **Capability Detection**: Supports tools, vision, computer use, thinking modes, and more
+- **Fallback System**: Maintains backward compatibility with Python constants
 
 ### Advanced Features
 
@@ -85,13 +96,21 @@ response = model.chat(
 print(f"Used {response.reasoning_tokens} reasoning tokens")
 ```
 
-### Default Caching
+### Response Caching  
 
-**Result caching is enabled by default for all methods.**
+**Result caching is disabled by default for predictable API client behavior.**
 
-To disable caching, you can either:
-  * set `ignore_cache=True` for each method call (`complete`, `chat`, `json`, `pydantic`)
-  * set `ignore_cache=True` as a kwarg at model construction
+To enable caching for better performance, you can either:
+  * set `ignore_cache=False` for each method call (`complete`, `chat`, `json`, `pydantic`)
+  * set `ignore_cache=False` as a kwarg at model construction
+
+```python
+# Enable caching at model level
+model = OpenAIModel(ignore_cache=False)
+
+# Enable caching for specific calls
+response = model.chat("Hello", ignore_cache=False)
+```
 
 Cached objects are stored in `~/.alea/cache/{provider}/{endpoint_model_hash}/{call_hash}.json`
 in compressed `.json.gz` format.  You can delete these files to clear the cache.
@@ -231,6 +250,87 @@ sequenceDiagram
     OpenAICompatibleModel-->>BaseAIModel: JSONModelResponse
     BaseAIModel-->>Client: JSONModelResponse
 ```
+
+## Testing
+
+The library includes comprehensive test coverage with intelligent rate limiting for all 97 models:
+
+### Test Features
+* **All model providers**: OpenAI (72 models), Anthropic (9 models), Google (7 models), xAI (9 models), VLLM
+* **Complete API coverage**: Sync/async operations, JSON/Pydantic responses, error handling, retry logic
+* **Real API integration**: Tests use actual provider APIs with intelligent rate limiting
+* **Cache functionality**: Response caching with configurable ignore options
+
+### Rate Limiting Configuration
+Prevent API quota exhaustion with configurable delays:
+```bash
+# Google API (most restrictive)
+export GOOGLE_API_DELAY=2.0        # Seconds between calls (default: 2.0)
+export GOOGLE_API_CONCURRENT=1     # Max concurrent calls (default: 1)
+
+# Anthropic API  
+export ANTHROPIC_API_DELAY=0.5     # Seconds between calls (default: 0.5)
+export ANTHROPIC_API_CONCURRENT=3  # Max concurrent calls (default: 3)
+
+# OpenAI API
+export OPENAI_API_DELAY=0.2        # Seconds between calls (default: 0.2)
+export OPENAI_API_CONCURRENT=5     # Max concurrent calls (default: 5)
+
+# xAI/Grok API
+export XAI_API_DELAY=1.0           # Seconds between calls (default: 1.0)
+export XAI_API_CONCURRENT=2        # Max concurrent calls (default: 2)
+
+# VLLM (local servers)
+export VLLM_API_DELAY=0.1          # Seconds between calls (default: 0.1)
+export VLLM_API_CONCURRENT=10      # Max concurrent calls (default: 10)
+```
+
+### Running Tests
+```bash
+# Run all tests with rate limiting
+uv run pytest tests/
+
+# Run specific provider tests
+uv run pytest tests/test_openai.py
+uv run pytest tests/test_anthropic.py
+
+# Custom VLLM server testing
+export VLLM_ENDPOINT="http://192.168.1.118:8080/"
+export VLLM_MODEL="Qwen/Qwen3-4B-Instruct-2507"
+uv run pytest tests/test_vllm.py
+```
+
+## Migration Guide
+
+### Upgrading from v0.1.x to v0.2.x
+
+**⚠️ Important Changes:**
+
+1. **Google Model Key Path**: The Google API key path changed from `~/.alea/keys/google` to `~/.alea/keys/gemini`
+2. **Model Registry**: Now uses dynamic JSON configuration with 97 real models (was 50+ theoretical models)
+3. **Test Configuration**: Added rate limiting system - tests may run slower but prevent API quota exhaustion
+
+**Migration Steps:**
+```bash
+# 1. Update Google API key path if you use Google models
+mv ~/.alea/keys/google ~/.alea/keys/gemini  # If the file exists
+
+# 2. Update to latest version
+pip install --upgrade alea-llm-client
+
+# 3. No code changes required - all existing APIs remain compatible
+```
+
+**What's New in v0.2.x:**
+- **97 Real Models**: All models now sourced from live API calls (vs theoretical documentation)
+- **Enhanced Capabilities**: Tool use, vision, computer use, thinking modes, reasoning tokens
+- **Better Testing**: Intelligent rate limiting prevents API quota issues
+- **Dynamic Configuration**: Model registry updates automatically from provider APIs
+
+**Breaking Changes (minimal impact):**
+- **Google key path**: `~/.alea/keys/google` → `~/.alea/keys/gemini`
+- **ModelResponse.text**: Changed from `Optional[str]` to `str` (empty string default)
+- **Test timing**: Rate limiting may slow test execution (configurable via environment variables)
 
 ## License
 

@@ -93,10 +93,7 @@ def format_prompt_sections(sections: dict) -> list[str]:
         section_title = normalize_section_title(section_title)
         section_tag = get_section_tag(section_title)
         formatted_sections.append(
-            f"# {section_title}\n"
-            f"<{section_tag}>\n"
-            f"{format_section_content(section_content).strip()}\n"
-            f"</{section_tag}>"
+            f"# {section_title}\n<{section_tag}>\n{format_section_content(section_content).strip()}\n</{section_tag}>"
         )
     return formatted_sections
 

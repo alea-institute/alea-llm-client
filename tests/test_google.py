@@ -1,52 +1,35 @@
 import os
+from typing import cast
+from unittest.mock import patch
 
 import pytest
-from typing import List, Dict
-from unittest.mock import patch
-from pydantic import BaseModel
+from conftest import PydanticTestModel
 
-from alea_llm_client import GoogleModel, ModelResponse, JSONModelResponse
+from alea_llm_client import GoogleModel, JSONModelResponse, ModelResponse
 from alea_llm_client.core.exceptions import ALEARetryExhaustedError
 
 
-@pytest.fixture
-def google_model():
-    access_token = os.environ.get("VERTEX_ACCESS_TOKEN")
-    project_id = os.environ.get("VERTEX_PROJECT_ID")
-    location_id = os.environ.get("VERTEX_LOCATION_ID")
-
-    # Build kwargs only if values are set, otherwise use defaults
-    kwargs = {}
-    if access_token:
-        kwargs["api_key"] = access_token
-    if project_id:
-        kwargs["project_id"] = project_id
-    if location_id:
-        kwargs["location_id"] = location_id
-        kwargs["endpoint"] = f"https://{location_id}-aiplatform.googleapis.com"
-
-    return GoogleModel(model="gemini-2.0-flash-exp", **kwargs)
-
-
 def test_simple_addition(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {"role": "user", "parts": [{"text": "What is 2 + 2?"}]},
     ]
     response: ModelResponse = google_model.chat(messages=prompt)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "4" in content, f"Expected '4' in the response, but got: {content}"
 
 
 # def test with ignore_cache=True
 def test_simple_addition_ignore_cache(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {"role": "user", "parts": [{"text": "What is 2 + 2?"}]},
     ]
     response: ModelResponse = google_model.chat(messages=prompt, ignore_cache=True)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "4" in content, f"Expected '4' in the response, but got: {content}"
 
@@ -62,13 +45,11 @@ def test_json_response(google_model: GoogleModel):
 
 
 def test_chat_with_system_prompt(google_model: GoogleModel):
-    messages: List[Dict[str, str]] = [
+    messages: list[dict[str, str]] = [
         {"role": "user", "parts": [{"text": "What is 2 + 2?"}]},
     ]
     system_instruction: dict = {"parts": [{"text": "You are a helpful assistant."}]}
-    response: ModelResponse = google_model.chat(
-        messages=messages, system_instruction=system_instruction
-    )
+    response: ModelResponse = google_model.chat(messages=messages, system_instruction=system_instruction)
 
     assert isinstance(response, ModelResponse)
     assert response is not None
@@ -80,19 +61,20 @@ def test_chat_with_system_prompt(google_model: GoogleModel):
 
 @pytest.mark.asyncio
 async def test_chat_async(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {"role": "user", "parts": [{"text": "What is 2 * 3?"}]},
     ]
     response: ModelResponse = await google_model.chat_async(messages=prompt)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "6" in content, f"Expected '6' in the response, but got: {content}"
 
 
 @pytest.mark.asyncio
 async def test_json_async(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "parts": [
@@ -114,9 +96,8 @@ def test_retry_wrapper_exhaustion(google_model: GoogleModel):
     def failing_function(*args, **kwargs):
         raise Exception("Simulated failure")
 
-    with patch.object(google_model, "_chat", side_effect=failing_function):
-        with pytest.raises(ALEARetryExhaustedError):
-            google_model.chat("Test message")
+    with patch.object(google_model, "_chat", side_effect=failing_function), pytest.raises(ALEARetryExhaustedError):
+        google_model.chat("Test message", ignore_cache=True)
 
 
 @pytest.mark.asyncio
@@ -126,13 +107,14 @@ async def test_retry_wrapper_async_exhaustion(google_model: GoogleModel):
 
     with patch.object(google_model, "_chat_async", side_effect=failing_function):
         with pytest.raises(ALEARetryExhaustedError):
-            await google_model.chat_async("Test message")
+            await google_model.chat_async("Test message", ignore_cache=True)
 
 
 def test_cache_functionality(google_model: GoogleModel, tmp_path):
     google_model.cache_path = tmp_path
+    google_model.ignore_cache = False  # Enable caching for this test
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             # "content": "What is the capital of France?",
@@ -153,8 +135,9 @@ def test_cache_functionality(google_model: GoogleModel, tmp_path):
 @pytest.mark.asyncio
 async def test_cache_functionality_async(google_model: GoogleModel, tmp_path):
     google_model.cache_path = tmp_path
+    google_model.ignore_cache = False  # Enable caching for this test
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             # "content": "What is the capital of Germany?",
@@ -165,29 +148,25 @@ async def test_cache_functionality_async(google_model: GoogleModel, tmp_path):
     response1: ModelResponse = await google_model.chat_async(messages=prompt)
     response2: ModelResponse = await google_model.chat_async(messages=prompt)
 
+    assert response1.text is not None
+    assert response2.text is not None
     assert "Berlin" in response1.text and "Berlin" in response2.text
     assert len(list(tmp_path.glob("*.json.gz"))) == 1  # Check if cache file was created
 
 
-class PydanticTestModel(BaseModel):
-    name: str
-    age: int
-
-
 def test_pydantic_response(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             # "content": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old.",
             "parts": [
-                {
-                    "text": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old."
-                }
+                {"text": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old."}
             ],
         },
     ]
-    response: PydanticTestModel = google_model.pydantic(
-        messages=prompt, pydantic_model=PydanticTestModel
+    response = cast(
+        PydanticTestModel,
+        google_model.pydantic(messages=prompt, pydantic_model=PydanticTestModel),
     )
 
     assert isinstance(response, PydanticTestModel)
@@ -197,7 +176,7 @@ def test_pydantic_response(google_model: GoogleModel):
 
 @pytest.mark.asyncio
 async def test_pydantic_async(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             # "content": "Give me a JSON object with keys 'name' and 'age' for a person named Charlie who is 35 years old.",
@@ -208,8 +187,9 @@ async def test_pydantic_async(google_model: GoogleModel):
             ],
         },
     ]
-    response: PydanticTestModel = await google_model.pydantic_async(
-        messages=prompt, pydantic_model=PydanticTestModel
+    response = cast(
+        PydanticTestModel,
+        await google_model.pydantic_async(messages=prompt, pydantic_model=PydanticTestModel),
     )
 
     assert isinstance(response, PydanticTestModel)
@@ -218,7 +198,7 @@ async def test_pydantic_async(google_model: GoogleModel):
 
 
 def test_missing_pydantic_model(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             # "content": "Give me a JSON object.",
@@ -230,7 +210,7 @@ def test_missing_pydantic_model(google_model: GoogleModel):
 
 
 def test_max_tokens(google_model: GoogleModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             # "content": "Write a very long story.",
@@ -238,9 +218,8 @@ def test_max_tokens(google_model: GoogleModel):
         },
     ]
     max_tokens = 50
-    response: ModelResponse = google_model.chat(
-        messages=prompt, generation_config={"maxOutputTokens": max_tokens}
-    )
+    response: ModelResponse = google_model.chat(messages=prompt, generation_config={"maxOutputTokens": max_tokens})
+    assert response.text is not None
     assert len(response.text.split()) <= max_tokens
 
 
@@ -290,9 +269,7 @@ def test_unset_api_key():
 
         # Check that the error message is helpful
         error_msg = str(exc_info.value)
-        assert "Gemini API key not found" in error_msg
-        assert "GOOGLE_API_KEY" in error_msg
-        assert "VERTEX_API_KEY" in error_msg
+        assert "Google API key not found" in error_msg
     finally:
         # Restore the key file
         if key_exists:

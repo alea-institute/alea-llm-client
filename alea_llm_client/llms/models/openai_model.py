@@ -6,7 +6,6 @@ and JSON completions using OpenAI's language models.
 """
 
 # Standard library imports
-import os
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -20,10 +19,10 @@ from alea_llm_client.llms.models.base_ai_model import (
     ModelResponse,
 )
 from alea_llm_client.llms.models.openai_compatible_model import OpenAICompatibleModel
+from alea_llm_client.llms.utils.api_keys import get_openai_api_key
 
 DEFAULT_ENDPOINT = "https://api.openai.com/"
 DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "openai"
-DEFAULT_KEY_PATH = Path.home() / ".alea" / "keys" / "openai"
 
 
 class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
@@ -38,7 +37,7 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
         self,
         api_key: Optional[str] = None,
         model: str = "gpt-5-chat-latest",
-        endpoint: Optional[str] = DEFAULT_ENDPOINT,
+        endpoint: str = DEFAULT_ENDPOINT,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
         **kwargs: Any,
@@ -62,12 +61,7 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
             cache_path=cache_path,
             **kwargs,
         )
-        if endpoint is None:
-            self.logger.info(f"Initialized OpenAIModel with model: {model}")
-        else:
-            self.logger.info(
-                f"Initialized OpenAIModel with model: {model} and endpoint: {endpoint}"
-            )
+        self.logger.info(f"Initialized OpenAIModel with model: {model} and endpoint: {endpoint}")
 
     def get_api_key(self) -> str:
         """
@@ -79,26 +73,7 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
         Raises:
             ValueError: If the OPENAI_API_KEY is not found in environment variables.
         """
-        # check if api_key is set
-        api_key = self.init_kwargs.get("api_key", None)
-        if api_key and api_key.strip():
-            return api_key
-
-        self.logger.debug("Attempting to get OpenAI API key from environment variables")
-        api_key = os.environ.get("OPENAI_API_KEY", None)
-        if api_key and api_key.strip():
-            return api_key
-
-        # try to load from key path
-        self.logger.debug("Attempting to get OpenAI API key from key file")
-        if DEFAULT_KEY_PATH.exists():
-            api_key = DEFAULT_KEY_PATH.read_text().strip()
-            if len(api_key) > 0:
-                return api_key
-
-        raise ValueError(
-            "OPENAI_API_KEY not found in environment variables or key file."
-        )
+        return get_openai_api_key(self.init_kwargs)
 
     def _json(self, *args: Any, **kwargs: Any) -> JSONModelResponse:
         """
@@ -187,8 +162,6 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
         )
 
         if reasoning_tokens:
-            self.logger.debug(
-                f"OpenAI model response used {reasoning_tokens} reasoning tokens"
-            )
+            self.logger.debug(f"OpenAI model response used {reasoning_tokens} reasoning tokens")
 
         return model_response

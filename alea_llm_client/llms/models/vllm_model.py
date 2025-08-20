@@ -6,6 +6,7 @@ chat and JSON completions using OpenAI's language models.
 """
 
 import hashlib
+import os
 
 # Standard library imports
 from pathlib import Path
@@ -19,8 +20,10 @@ from alea_llm_client.llms.models.base_ai_model import (
     JSONModelResponse,
 )
 from alea_llm_client.llms.models.openai_compatible_model import OpenAICompatibleModel
+from alea_llm_client.llms.utils.api_keys import get_vllm_api_key
 
-DEFAULT_ENDPOINT = "http://localhost:8000/"
+DEFAULT_ENDPOINT = os.environ.get("VLLM_ENDPOINT", "http://localhost:8000/")
+DEFAULT_MODEL = os.environ.get("VLLM_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct")
 DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "vllm"
 DEFAULT_KEY_PATH = Path.home() / ".alea" / "keys" / "vllm"
 
@@ -36,8 +39,8 @@ class VLLMModel(OpenAICompatibleModel, LoggerMixin):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        endpoint: Optional[str] = DEFAULT_ENDPOINT,
+        model: str = DEFAULT_MODEL,
+        endpoint: str = DEFAULT_ENDPOINT,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
         **kwargs: Any,
@@ -52,10 +55,10 @@ class VLLMModel(OpenAICompatibleModel, LoggerMixin):
             formatter: A function to format input messages.
             cache_path: The path to the cache directory for storing model responses.
         """
-        # add the endpoint and model hashes to the cache path if cache_path and endpoint are provided
-        if cache_path is not None and endpoint is not None:
-            endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
-            model_hash = hashlib.blake2b(model.encode()).hexdigest()
+        # add the endpoint and model hashes to the cache path
+        endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
+        model_hash = hashlib.blake2b(model.encode()).hexdigest()
+        if cache_path is not None:
             cache_path = cache_path / endpoint_hash / model_hash
             cache_path.mkdir(parents=True, exist_ok=True)
 
@@ -68,12 +71,7 @@ class VLLMModel(OpenAICompatibleModel, LoggerMixin):
             cache_path=cache_path,
             **kwargs,
         )
-        if endpoint is None:
-            self.logger.info(f"Initialized VLLMModel with model: {model}")
-        else:
-            self.logger.info(
-                f"Initialized VLLMModel with model: {model} and endpoint: {endpoint}"
-            )
+        self.logger.info(f"Initialized VLLMModel with model: {model} and endpoint: {endpoint}")
 
     def get_api_key(self) -> str:
         """
@@ -82,8 +80,7 @@ class VLLMModel(OpenAICompatibleModel, LoggerMixin):
         Returns:
             The VLLM API key, which is just a placeholder.
         """
-        # we don't need one for VLLM
-        return "key"
+        return get_vllm_api_key(self.init_kwargs)
 
     def _json(self, *args: Any, **kwargs: Any) -> JSONModelResponse:
         """

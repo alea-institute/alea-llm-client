@@ -1,15 +1,15 @@
 """Tests for the model capabilities matrix."""
 
 from alea_llm_client.llms import (
+    COMPLETE_MODEL_CAPABILITIES,
     ModelStatus,
     ModelTier,
-    COMPLETE_MODEL_CAPABILITIES,
-    get_models_with_context_window_gte,
-    get_models_with_capability,
-    get_models_by_tier,
-    get_model_details,
     compare_models,
     filter_models,
+    get_model_details,
+    get_models_by_tier,
+    get_models_with_capability,
+    get_models_with_context_window_gte,
 )
 
 
@@ -161,9 +161,7 @@ def test_advanced_filtering():
 def test_provider_filtering():
     """Test filtering by provider."""
     # Filter for OpenAI models with tools
-    openai_tools = filter_models(
-        providers=["openai"], capabilities=["tools"], exclude_deprecated=True
-    )
+    openai_tools = filter_models(providers=["openai"], capabilities=["tools"], exclude_deprecated=True)
 
     assert len(openai_tools) > 10
     assert all("gpt" in m or m.startswith("o") for m in openai_tools)
@@ -203,15 +201,9 @@ def test_special_requirements():
     for model_name, caps in COMPLETE_MODEL_CAPABILITIES.items():
         if caps.supports_thinking:
             if "claude" in model_name:
-                assert (
-                    caps.thinking_budget_min is not None
-                    and caps.thinking_budget_min >= 1024
-                )
+                assert caps.thinking_budget_min is not None and caps.thinking_budget_min >= 1024
             if "gemini" in model_name:
-                assert (
-                    caps.thinking_budget_min is not None
-                    and caps.thinking_budget_min >= 4000
-                )
+                assert caps.thinking_budget_min is not None and caps.thinking_budget_min >= 4000
 
 
 def test_modality_support():

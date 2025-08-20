@@ -1,8 +1,9 @@
 """Comprehensive model registry for all supported LLM providers.
 
-This module contains complete model listings for all supported providers,
-organized by provider and model family. Model names are sourced directly
-from official SDKs and documentation.
+This module provides model listings and capability queries, backed by
+the authoritative model capabilities data from model_capabilities.py.
+
+Model names are sourced directly from official SDKs and documentation.
 
 Sources:
 - OpenAI: references/openai-python/src/openai/types/shared/chat_model.py
@@ -13,11 +14,18 @@ Sources:
 Last Updated: August 2025
 """
 
-from enum import Enum
-from typing import Set, Optional, Dict
 from dataclasses import dataclass
+from enum import Enum
+from typing import Optional
 
-# Import the comprehensive capabilities
+from alea_llm_client.llms.config.loader import get_global_loader
+
+# Import the comprehensive capabilities - this is our single source of truth
+from .model_capabilities import (
+    COMPLETE_MODEL_CAPABILITIES,
+    DetailedCapabilities,
+    ModelStatus,
+)
 
 
 class OpenAIModels(str, Enum):
@@ -218,13 +226,14 @@ class GrokModels(str, Enum):
     GROK_BETA = "grok-beta"
 
 
+# Legacy compatibility: Simple capabilities alias for backward compatibility
 @dataclass
 class ModelCapabilities:
-    """Model capabilities and metadata."""
+    """Legacy model capabilities for backward compatibility."""
 
     provider: str
     family: str
-    size: Optional[str] = None  # mini, nano, small, medium, large, etc.
+    size: Optional[str] = None
     supports_grammar: bool = False
     supports_reasoning_effort: bool = False
     supports_thinking: bool = False
@@ -237,85 +246,48 @@ class ModelCapabilities:
     is_deprecated: bool = False
     knowledge_cutoff: Optional[str] = None
 
-
-# Model capability mappings
-MODEL_CAPABILITIES: Dict[str, ModelCapabilities] = {
-    # GPT-5 Models - all support grammar
-    "gpt-5": ModelCapabilities("openai", "gpt-5", "standard", supports_grammar=True),
-    "gpt-5-mini": ModelCapabilities("openai", "gpt-5", "mini", supports_grammar=True),
-    "gpt-5-nano": ModelCapabilities("openai", "gpt-5", "nano", supports_grammar=True),
-    # O-Series - all support reasoning_effort and require max_completion_tokens
-    "o4-mini": ModelCapabilities(
-        "openai",
-        "o-series",
-        "mini",
-        supports_reasoning_effort=True,
-        requires_max_completion_tokens=True,
-    ),
-    "o3": ModelCapabilities(
-        "openai",
-        "o-series",
-        "standard",
-        supports_reasoning_effort=True,
-        requires_max_completion_tokens=True,
-    ),
-    "o3-mini": ModelCapabilities(
-        "openai",
-        "o-series",
-        "mini",
-        supports_reasoning_effort=True,
-        requires_max_completion_tokens=True,
-    ),
-    "o1": ModelCapabilities(
-        "openai",
-        "o-series",
-        "standard",
-        supports_reasoning_effort=True,
-        requires_max_completion_tokens=True,
-    ),
-    # Claude 4 - supports thinking
-    "claude-sonnet-4-20250514": ModelCapabilities(
-        "anthropic", "claude-4", "sonnet", supports_thinking=True
-    ),
-    "claude-opus-4-20250514": ModelCapabilities(
-        "anthropic", "claude-4", "opus", supports_thinking=True
-    ),
-    # Claude 3.7 - supports thinking
-    "claude-3-7-sonnet-latest": ModelCapabilities(
-        "anthropic", "claude-3.7", "sonnet", supports_thinking=True
-    ),
-    # Gemini 2.5 - supports thinking
-    "gemini-2.5-flash": ModelCapabilities(
-        "google", "gemini-2.5", "flash", supports_thinking=True
-    ),
-    "gemini-2.5-pro": ModelCapabilities(
-        "google", "gemini-2.5", "pro", supports_thinking=True
-    ),
-    # Grok 4 - latest with search
-    "grok-4": ModelCapabilities(
-        "xai", "grok-4", "standard", supports_search=True, knowledge_cutoff="2024-11"
-    ),
-}
+    @classmethod
+    def from_detailed_capabilities(cls, detailed: DetailedCapabilities) -> "ModelCapabilities":
+        """Convert from DetailedCapabilities to legacy format."""
+        return cls(
+            provider=detailed.provider,
+            family=detailed.family,
+            size=detailed.tier.value,
+            supports_grammar=detailed.supports_grammar,
+            supports_reasoning_effort=detailed.supports_reasoning_effort,
+            supports_thinking=detailed.supports_thinking,
+            supports_audio=detailed.supports_audio_input or detailed.supports_audio_output,
+            supports_vision=detailed.supports_vision,
+            supports_search=detailed.supports_search,
+            supports_realtime=detailed.supports_realtime,
+            supports_computer_use=detailed.supports_computer_use,
+            requires_max_completion_tokens=detailed.requires_max_completion_tokens,
+            is_deprecated=detailed.status in [ModelStatus.DEPRECATED, ModelStatus.LEGACY],
+            knowledge_cutoff=detailed.knowledge_cutoff,
+        )
 
 
-def get_all_models() -> Set[str]:
+def get_all_models() -> set[str]:
     """Get all available model names across all providers."""
-    models = set()
+    # Try to use dynamic configuration first as the authoritative source
+    try:
+        loader = get_global_loader()
+        providers = loader.get_providers()
+        models = set()
 
-    # Add all enum values
-    for model in OpenAIModels:
-        models.add(model.value)
-    for model in AnthropicModels:
-        models.add(model.value)
-    for model in GoogleModels:
-        models.add(model.value)
-    for model in GrokModels:
-        models.add(model.value)
+        for provider_config in providers.values():
+            models.update(provider_config.models.keys())
 
-    return models
+        if models:  # Only use dynamic if we actually loaded models
+            return models
+    except Exception:
+        pass  # Fall back to static capabilities
+
+    # Fallback to the comprehensive model capabilities
+    return set(COMPLETE_MODEL_CAPABILITIES.keys())
 
 
-def get_provider_models(provider: str) -> Set[str]:
+def get_provider_models(provider: str) -> set[str]:
     """Get all models for a specific provider.
 
     Args:
@@ -326,16 +298,22 @@ def get_provider_models(provider: str) -> Set[str]:
     """
     provider = provider.lower()
 
-    if provider == "openai":
-        return {model.value for model in OpenAIModels}
-    elif provider == "anthropic":
-        return {model.value for model in AnthropicModels}
-    elif provider == "google":
-        return {model.value for model in GoogleModels}
-    elif provider in ["xai", "grok"]:
-        return {model.value for model in GrokModels}
-    else:
-        return set()
+    # Normalize provider names
+    if provider in ["xai", "grok"]:
+        provider = "xai"
+
+    # Try to use dynamic configuration first
+    try:
+        loader = get_global_loader()
+        models = loader.get_models_by_provider(provider)
+
+        if models:  # Only use dynamic if we actually loaded models
+            return set(models)
+    except Exception:
+        pass  # Fall back to static capabilities
+
+    # Fallback to static capabilities
+    return {name for name, caps in COMPLETE_MODEL_CAPABILITIES.items() if caps.provider.lower() == provider}
 
 
 def get_model_capabilities(model_name: str) -> Optional[ModelCapabilities]:
@@ -347,7 +325,22 @@ def get_model_capabilities(model_name: str) -> Optional[ModelCapabilities]:
     Returns:
         ModelCapabilities object or None if not found
     """
-    return MODEL_CAPABILITIES.get(model_name)
+    detailed = COMPLETE_MODEL_CAPABILITIES.get(model_name)
+    if detailed:
+        return ModelCapabilities.from_detailed_capabilities(detailed)
+    return None
+
+
+def get_detailed_model_capabilities(model_name: str) -> Optional[DetailedCapabilities]:
+    """Get detailed capabilities for a specific model.
+
+    Args:
+        model_name: The model identifier
+
+    Returns:
+        DetailedCapabilities object or None if not found
+    """
+    return COMPLETE_MODEL_CAPABILITIES.get(model_name)
 
 
 def is_model_deprecated(model_name: str) -> bool:
@@ -359,12 +352,11 @@ def is_model_deprecated(model_name: str) -> bool:
     Returns:
         True if deprecated, False otherwise
     """
-    # Check explicit deprecation status
-    caps = get_model_capabilities(model_name)
-    if caps and caps.is_deprecated:
-        return True
+    detailed = COMPLETE_MODEL_CAPABILITIES.get(model_name)
+    if detailed:
+        return detailed.status in [ModelStatus.DEPRECATED, ModelStatus.LEGACY]
 
-    # GPT-3.5 and GPT-4 (non-turbo) are generally deprecated
+    # Fallback heuristics for models not in capabilities data
     if model_name.startswith("gpt-3.5-") or model_name.startswith("gpt-4-"):
         if "turbo" not in model_name and "o" not in model_name:
             return True
@@ -378,14 +370,15 @@ def supports_feature(model_name: str, feature: str) -> bool:
     Args:
         model_name: The model identifier
         feature: One of 'grammar', 'reasoning_effort', 'thinking', 'audio',
-                'vision', 'search', 'realtime', 'computer_use'
+                'vision', 'search', 'realtime', 'computer_use', 'tools',
+                'structured_output', 'streaming', 'fine_tuning'
 
     Returns:
         True if the model supports the feature
     """
-    caps = get_model_capabilities(model_name)
-    if not caps:
-        # Try to infer from model name patterns
+    detailed = COMPLETE_MODEL_CAPABILITIES.get(model_name)
+    if not detailed:
+        # Fallback heuristics for models not in capabilities data
         if feature == "grammar" and model_name.startswith("gpt-5"):
             return True
         if feature == "reasoning_effort" and model_name.startswith(("o1", "o3", "o4")):
@@ -393,7 +386,7 @@ def supports_feature(model_name: str, feature: str) -> bool:
         if feature == "thinking":
             if "claude-4" in model_name or "claude-3-7" in model_name:
                 return True
-            if "gemini-2.5" in model_name or "gemini-2.0" in model_name:
+            if "gemini-2.5" in model_name:
                 return True
         if feature == "audio" and "audio" in model_name:
             return True
@@ -401,73 +394,126 @@ def supports_feature(model_name: str, feature: str) -> bool:
             return True
         if feature == "realtime" and "realtime" in model_name:
             return True
-        if feature == "computer_use" and "computer-use" in model_name:
-            return True
-        return False
+        return bool(feature == "computer_use" and "computer-use" in model_name)
 
+    # Use comprehensive capabilities data
     feature_map = {
-        "grammar": caps.supports_grammar,
-        "reasoning_effort": caps.supports_reasoning_effort,
-        "thinking": caps.supports_thinking,
-        "audio": caps.supports_audio,
-        "vision": caps.supports_vision,
-        "search": caps.supports_search,
-        "realtime": caps.supports_realtime,
-        "computer_use": caps.supports_computer_use,
+        "grammar": detailed.supports_grammar,
+        "reasoning_effort": detailed.supports_reasoning_effort,
+        "thinking": detailed.supports_thinking,
+        "audio": detailed.supports_audio_input or detailed.supports_audio_output,
+        "audio_input": detailed.supports_audio_input,
+        "audio_output": detailed.supports_audio_output,
+        "vision": detailed.supports_vision,
+        "search": detailed.supports_search,
+        "realtime": detailed.supports_realtime,
+        "computer_use": detailed.supports_computer_use,
+        "tools": detailed.supports_tools,
+        "structured_output": detailed.supports_structured_output,
+        "streaming": detailed.supports_streaming,
+        "fine_tuning": detailed.supports_fine_tuning,
+        "reasoning": detailed.supports_reasoning,
     }
 
     return feature_map.get(feature, False)
 
 
-# Default models per provider (for quick access)
-DEFAULT_MODELS = {
-    "openai": OpenAIModels.GPT_5_CHAT_LATEST.value,
-    "anthropic": AnthropicModels.CLAUDE_SONNET_4_20250514.value,
-    "google": GoogleModels.GEMINI_2_0_FLASH_EXP.value,
-    "xai": GrokModels.GROK_2_1212.value,
-}
+# Default models per provider (dynamically determined from capabilities)
+def get_default_models() -> dict[str, str]:
+    """Get default model for each provider based on comprehensive capabilities."""
+    defaults = {}
+
+    # Try to use dynamic configuration first
+    try:
+        loader = get_global_loader()
+        providers = loader.get_providers()
+
+        for provider_name, provider_config in providers.items():
+            chat_default = provider_config.defaults.get("chat")
+            if chat_default:
+                defaults[provider_name] = chat_default
+                continue
+
+    except Exception:
+        pass  # Fall back to static defaults
+
+    # Static fallback logic for any missing providers
+    for provider in ["openai", "anthropic", "google", "xai"]:
+        if provider in defaults:
+            continue  # Already have dynamic default
+
+        provider_models = get_provider_models(provider)
+
+        # Find the best available model for each provider
+        if provider == "openai":
+            # Prefer GPT-5 chat latest, fallback to available GPT-5 models
+            for candidate in ["gpt-5-chat-latest", "gpt-5", "gpt-4o"]:
+                if candidate in provider_models:
+                    defaults[provider] = candidate
+                    break
+        elif provider == "anthropic":
+            # Prefer Claude 4 sonnet, fallback to Claude 3.5 sonnet
+            for candidate in ["claude-sonnet-4-20250514", "claude-3-5-sonnet-latest"]:
+                if candidate in provider_models:
+                    defaults[provider] = candidate
+                    break
+        elif provider == "google":
+            # Prefer Gemini 2.0 flash exp, fallback to 2.0 flash
+            for candidate in [
+                "gemini-2.0-flash-exp",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+            ]:
+                if candidate in provider_models:
+                    defaults[provider] = candidate
+                    break
+        elif provider == "xai":
+            # Prefer Grok 2-1212, fallback to Grok 4, then Grok 2
+            for candidate in ["grok-2-1212", "grok-4", "grok-2"]:
+                if candidate in provider_models:
+                    defaults[provider] = candidate
+                    break
+
+    return defaults
 
 
-# Model size categories for easy filtering
-MODEL_SIZES = {
-    "nano": [
-        OpenAIModels.GPT_5_NANO,
-        OpenAIModels.GPT_4_1_NANO,
-    ],
-    "mini": [
-        OpenAIModels.GPT_5_MINI,
-        OpenAIModels.GPT_4_1_MINI,
-        OpenAIModels.O4_MINI,
-        OpenAIModels.O3_MINI,
-        OpenAIModels.O1_MINI,
-        OpenAIModels.GPT_4O_MINI,
-        GrokModels.GROK_3_MINI,
-        GrokModels.GROK_2_MINI,
-    ],
-    "small": [
-        AnthropicModels.CLAUDE_3_5_HAIKU_LATEST,
-        AnthropicModels.CLAUDE_3_HAIKU_20240307,
-    ],
-    "medium": [
-        AnthropicModels.CLAUDE_3_5_SONNET_LATEST,
-        AnthropicModels.CLAUDE_3_7_SONNET_LATEST,
-        AnthropicModels.CLAUDE_SONNET_4_20250514,
-    ],
-    "large": [
-        AnthropicModels.CLAUDE_3_OPUS_LATEST,
-        AnthropicModels.CLAUDE_OPUS_4_20250514,
-        GrokModels.GROK_4_HEAVY,
-    ],
-    "flash": [
-        GoogleModels.GEMINI_2_5_FLASH,
-        GoogleModels.GEMINI_2_0_FLASH,
-        GoogleModels.GEMINI_1_5_FLASH,
-    ],
-    "pro": [
-        GoogleModels.GEMINI_2_5_PRO,
-        GoogleModels.GEMINI_2_0_PRO,
-        GoogleModels.GEMINI_1_5_PRO,
-        OpenAIModels.O3_PRO,
-        OpenAIModels.O1_PRO,
-    ],
-}
+# Legacy compatibility
+DEFAULT_MODELS = get_default_models()
+
+
+# Model size categories dynamically generated from capabilities data
+def get_models_by_tier(tier: str) -> list[str]:
+    """Get all models of a specific tier/size category.
+
+    Args:
+        tier: One of 'nano', 'mini', 'small', 'medium', 'standard', 'large', 'pro', 'flash', 'heavy'
+
+    Returns:
+        List of model names in that tier
+    """
+    tier_models = []
+
+    for name, caps in COMPLETE_MODEL_CAPABILITIES.items():
+        if caps.tier.value == tier:
+            tier_models.append(name)
+
+    return tier_models
+
+
+# Legacy compatibility: Dynamic model size categories
+def get_model_sizes() -> dict[str, list[str]]:
+    """Get model size categories dynamically from capabilities data."""
+    return {
+        "nano": get_models_by_tier("nano"),
+        "mini": get_models_by_tier("mini"),
+        "small": get_models_by_tier("small"),
+        "medium": get_models_by_tier("medium"),
+        "standard": get_models_by_tier("standard"),
+        "large": get_models_by_tier("large"),
+        "pro": get_models_by_tier("pro"),
+        "flash": get_models_by_tier("flash"),
+        "heavy": get_models_by_tier("heavy"),
+    }
+
+
+MODEL_SIZES = get_model_sizes()

@@ -2,14 +2,14 @@
 
 import pytest
 
-from alea_llm_client import OpenAIModel, ModelResponse
+from alea_llm_client import ModelResponse, OpenAIModel
 from alea_llm_client.core.exceptions import ALEARetryExhaustedError
 from alea_llm_client.llms.constants import (
     EXAMPLE_GRAMMARS,
-    validate_grammar_definition,
+    GRAMMAR_SUPPORTED_MODELS,
     create_grammar_response_format,
     supports_grammar,
-    GRAMMAR_SUPPORTED_MODELS,
+    validate_grammar_definition,
 )
 
 
@@ -144,9 +144,7 @@ def test_binary_choice_grammar(gpt5_model: OpenAIModel):
     assert response.text is not None
     # Response should follow the grammar (accept various yes/no formats)
     response_text = response.text.strip().lower().replace(".", "")
-    assert response_text in ["yes", "no"], (
-        f"Expected yes/no response, got: {response.text}"
-    )
+    assert response_text in ["yes", "no"], f"Expected yes/no response, got: {response.text}"
 
 
 def test_number_regex_grammar(gpt5_model: OpenAIModel):
@@ -168,9 +166,7 @@ def test_number_regex_grammar(gpt5_model: OpenAIModel):
 
 def test_email_regex_grammar(gpt5_model: OpenAIModel):
     """Test email regex grammar with GPT-5 using Responses API."""
-    input_text = (
-        "Generate a valid email address for a user named John Doe at example.com"
-    )
+    input_text = "Generate a valid email address for a user named John Doe at example.com"
 
     email_grammar = EXAMPLE_GRAMMARS["email_regex"]
 
@@ -310,7 +306,5 @@ async def test_grammar_async(gpt5_model: OpenAIModel):
 def test_example_grammars_all_valid():
     """Test that all example grammars are valid."""
     for name, grammar_spec in EXAMPLE_GRAMMARS.items():
-        is_valid, error = validate_grammar_definition(
-            grammar_spec["definition"], grammar_spec["syntax"]
-        )
+        is_valid, error = validate_grammar_definition(grammar_spec["definition"], grammar_spec["syntax"])
         assert is_valid, f"Example grammar '{name}' is invalid: {error}"

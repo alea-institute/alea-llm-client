@@ -1,19 +1,15 @@
-import pytest
-from typing import List, Dict
+from typing import cast
 from unittest.mock import patch
-from pydantic import BaseModel
 
-from alea_llm_client import GrokModel, ModelResponse, JSONModelResponse
+import pytest
+from conftest import PydanticTestModel
+
+from alea_llm_client import GrokModel, JSONModelResponse, ModelResponse
 from alea_llm_client.core.exceptions import ALEARetryExhaustedError
 
 
-@pytest.fixture
-def grok_model():
-    return GrokModel()
-
-
 def test_simple_addition(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is 2 + 2?",
@@ -22,13 +18,14 @@ def test_simple_addition(grok_model: GrokModel):
     response: ModelResponse = grok_model.chat(messages=prompt)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "4" in content, f"Expected '4' in the response, but got: {content}"
 
 
 # def test with ignore_cache=True
 def test_simple_addition_ignore_cache(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is 2 + 2?",
@@ -37,6 +34,7 @@ def test_simple_addition_ignore_cache(grok_model: GrokModel):
     response: ModelResponse = grok_model.chat(messages=prompt, ignore_cache=True)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "4" in content, f"Expected '4' in the response, but got: {content}"
 
@@ -52,15 +50,15 @@ def test_json_response(grok_model: GrokModel):
 
 
 def test_format_with_system_prompt(grok_model: GrokModel):
-    expected_messages: List[Dict[str, str]] = [
+    expected_messages: list[dict[str, str]] = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Hello"},
     ]
-    messages: List[Dict[str, str]] = [
+    messages: list[dict[str, str]] = [
         {"role": "user", "content": "Hello"},
     ]
     system_prompt: str = "You are a helpful assistant."
-    formatted_messages: List[Dict[str, str]] = grok_model.format(
+    formatted_messages: list[dict[str, str]] = grok_model.format(
         args=[], kwargs={"messages": messages, "system": system_prompt}
     )
 
@@ -69,7 +67,7 @@ def test_format_with_system_prompt(grok_model: GrokModel):
 
 
 def test_chat_with_system_prompt(grok_model: GrokModel):
-    messages: List[Dict[str, str]] = [
+    messages: list[dict[str, str]] = [
         {"role": "user", "content": "Hello"},
     ]
     system_prompt: str = "You are a helpful assistant."
@@ -91,15 +89,14 @@ def test_formatter_identity():
             return kwargs.pop("messages")
 
     grok_model = GrokModel(formatter=formatter)
-    response: ModelResponse = grok_model.chat(
-        messages=[{"role": "user", "content": "2+2=?"}]
-    )
+    response: ModelResponse = grok_model.chat(messages=[{"role": "user", "content": "2+2=?"}])
+    assert response.text is not None
     assert "4" in response.text or "four" in response.text.lower()
 
 
 @pytest.mark.asyncio
 async def test_chat_async(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is 3 + 3?",
@@ -108,21 +105,20 @@ async def test_chat_async(grok_model: GrokModel):
     response: ModelResponse = await grok_model.chat_async(messages=prompt)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "6" in content, f"Expected '6' in the response, but got: {content}"
 
 
 @pytest.mark.asyncio
 async def test_json_async(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object with keys 'city' and 'population' for New York City with 8 million people.",
         },
     ]
-    response: JSONModelResponse = await grok_model.json_async(
-        messages=prompt, system="Respond in JSON."
-    )
+    response: JSONModelResponse = await grok_model.json_async(messages=prompt, system="Respond in JSON.")
 
     assert isinstance(response, JSONModelResponse)
     assert isinstance(response.data, dict)
@@ -134,9 +130,8 @@ def test_retry_wrapper_exhaustion(grok_model: GrokModel):
     def failing_function(*args, **kwargs):
         raise Exception("Simulated failure")
 
-    with patch.object(grok_model, "_chat", side_effect=failing_function):
-        with pytest.raises(ALEARetryExhaustedError):
-            grok_model.chat("Test message")
+    with patch.object(grok_model, "_chat", side_effect=failing_function), pytest.raises(ALEARetryExhaustedError):
+        grok_model.chat("Test message", ignore_cache=True)
 
 
 @pytest.mark.asyncio
@@ -146,13 +141,14 @@ async def test_retry_wrapper_async_exhaustion(grok_model: GrokModel):
 
     with patch.object(grok_model, "_chat_async", side_effect=failing_function):
         with pytest.raises(ALEARetryExhaustedError):
-            await grok_model.chat_async("Test message")
+            await grok_model.chat_async("Test message", ignore_cache=True)
 
 
 def test_cache_functionality(grok_model: GrokModel, tmp_path):
     grok_model.cache_path = tmp_path
+    grok_model.ignore_cache = False  # Enable caching for this test
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is the capital of France?",
@@ -172,8 +168,9 @@ def test_cache_functionality(grok_model: GrokModel, tmp_path):
 @pytest.mark.asyncio
 async def test_cache_functionality_async(grok_model: GrokModel, tmp_path):
     grok_model.cache_path = tmp_path
+    grok_model.ignore_cache = False  # Enable caching for this test
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is the capital of Germany?",
@@ -183,24 +180,22 @@ async def test_cache_functionality_async(grok_model: GrokModel, tmp_path):
     response1: ModelResponse = await grok_model.chat_async(messages=prompt)
     response2: ModelResponse = await grok_model.chat_async(messages=prompt)
 
+    assert response1.text is not None
+    assert response2.text is not None
     assert "Berlin" in response1.text and "Berlin" in response2.text
     assert len(list(tmp_path.glob("*.json.gz"))) == 1  # Check if cache file was created
 
 
-class PydanticTestModel(BaseModel):
-    name: str
-    age: int
-
-
 def test_pydantic_response(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old.",
         },
     ]
-    response: PydanticTestModel = grok_model.pydantic(
-        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
+    response = cast(
+        PydanticTestModel,
+        grok_model.pydantic(messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel),
     )
 
     assert isinstance(response, PydanticTestModel)
@@ -210,14 +205,15 @@ def test_pydantic_response(grok_model: GrokModel):
 
 @pytest.mark.asyncio
 async def test_pydantic_async(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Charlie who is 35 years old.",
         },
     ]
-    response: PydanticTestModel = await grok_model.pydantic_async(
-        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
+    response = cast(
+        PydanticTestModel,
+        await grok_model.pydantic_async(messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel),
     )
 
     assert isinstance(response, PydanticTestModel)
@@ -226,7 +222,7 @@ async def test_pydantic_async(grok_model: GrokModel):
 
 
 def test_missing_pydantic_model(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object.",
@@ -237,7 +233,7 @@ def test_missing_pydantic_model(grok_model: GrokModel):
 
 
 def test_max_tokens(grok_model: GrokModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Write a very long story.",
@@ -245,13 +241,12 @@ def test_max_tokens(grok_model: GrokModel):
     ]
     max_tokens = 50
     response: ModelResponse = grok_model.chat(messages=prompt, max_tokens=max_tokens)
+    assert response.text is not None
     assert len(response.text.split()) <= max_tokens
 
 
 def test_model_response_to_dict(grok_model: GrokModel):
-    response: ModelResponse = grok_model.chat(
-        messages=[{"role": "user", "content": "Hello"}]
-    )
+    response: ModelResponse = grok_model.chat(messages=[{"role": "user", "content": "Hello"}])
     response_dict = response.to_dict()
     assert isinstance(response_dict, dict)
     assert "choices" in response_dict
@@ -260,9 +255,7 @@ def test_model_response_to_dict(grok_model: GrokModel):
 
 
 def test_model_response_to_json(grok_model: GrokModel):
-    response: ModelResponse = grok_model.chat(
-        messages=[{"role": "user", "content": "Hello"}]
-    )
+    response: ModelResponse = grok_model.chat(messages=[{"role": "user", "content": "Hello"}])
     response_json = response.to_json()
     assert isinstance(response_json, str)
     assert "choices" in response_json

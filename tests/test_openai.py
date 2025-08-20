@@ -1,24 +1,20 @@
 import os
-import pytest
-from typing import List, Dict
+from typing import cast
 from unittest.mock import patch
-from pydantic import BaseModel
 
-from alea_llm_client import OpenAIModel, ModelResponse, JSONModelResponse
+import pytest
+from conftest import PydanticTestModel
+
+from alea_llm_client import JSONModelResponse, ModelResponse, OpenAIModel
 from alea_llm_client.core.exceptions import (
-    ALEARetryExhaustedError,
     ALEAAuthenticationError,
     ALEAModelError,
+    ALEARetryExhaustedError,
 )
 
 
-@pytest.fixture
-def openai_model():
-    return OpenAIModel()
-
-
 def test_simple_addition(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is 2 + 2?",
@@ -27,6 +23,7 @@ def test_simple_addition(openai_model: OpenAIModel):
     response: ModelResponse = openai_model.chat(messages=prompt)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "4" in content, f"Expected '4' in the response, but got: {content}"
 
@@ -36,16 +33,14 @@ def test_gpt5_reasoning_effort_minimal():
     """Test GPT-5 with minimal reasoning effort for fast responses."""
     model = OpenAIModel(model="gpt-5")
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "My distributed cache shows inconsistent data. Node A: '123', Node B: '456'. Both healthy.",
         },
     ]
 
-    response: ModelResponse = model.chat(
-        messages=prompt, reasoning_effort="minimal", verbosity="low"
-    )
+    response: ModelResponse = model.chat(messages=prompt, reasoning_effort="minimal", verbosity="low")
 
     assert isinstance(response, ModelResponse)
     assert response.text is not None
@@ -56,16 +51,14 @@ def test_gpt5_reasoning_effort_high():
     """Test GPT-5 with high reasoning effort for thorough analysis."""
     model = OpenAIModel(model="gpt-5")
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "My distributed cache shows inconsistent data. Node A: '123', Node B: '456'. Both healthy.",
         },
     ]
 
-    response: ModelResponse = model.chat(
-        messages=prompt, reasoning_effort="high", verbosity="high"
-    )
+    response: ModelResponse = model.chat(messages=prompt, reasoning_effort="high", verbosity="high")
 
     assert isinstance(response, ModelResponse)
     assert response.text is not None
@@ -76,7 +69,7 @@ def test_verbosity_control():
     """Test verbosity parameter for response length control."""
     model = OpenAIModel(model="gpt-5")
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is Raft consensus?",
@@ -104,16 +97,14 @@ def test_o_series_reasoning_tokens():
     """Test o-series models to ensure reasoning tokens are captured."""
     model = OpenAIModel(model="o3-mini")
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Prove that the square root of 2 is irrational using a contradiction argument.",
         },
     ]
 
-    response: ModelResponse = model.chat(
-        messages=prompt, reasoning_effort="high", max_completion_tokens=1000
-    )
+    response: ModelResponse = model.chat(messages=prompt, reasoning_effort="high", max_completion_tokens=1000)
 
     assert isinstance(response, ModelResponse)
     assert response.text is not None
@@ -129,7 +120,7 @@ def test_max_completion_tokens_parameter():
     """Test max_completion_tokens parameter (preferred over max_tokens for o-series)."""
     model = OpenAIModel(model="o3-mini")
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Write a short poem about artificial intelligence.",
@@ -151,7 +142,7 @@ def test_optimization_combinations():
     """Test parameter combinations for different use cases."""
     model = OpenAIModel(model="gpt-5")
 
-    base_prompt: List[Dict[str, str]] = [
+    base_prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Optimize this SQL: SELECT * FROM orders WHERE created_at > '2024-01-01'",
@@ -159,14 +150,10 @@ def test_optimization_combinations():
     ]
 
     # Speed optimized
-    fast_response: ModelResponse = model.chat(
-        messages=base_prompt, reasoning_effort="minimal", verbosity="low"
-    )
+    fast_response: ModelResponse = model.chat(messages=base_prompt, reasoning_effort="minimal", verbosity="low")
 
     # Thorough analysis
-    thorough_response: ModelResponse = model.chat(
-        messages=base_prompt, reasoning_effort="high", verbosity="high"
-    )
+    thorough_response: ModelResponse = model.chat(messages=base_prompt, reasoning_effort="high", verbosity="high")
 
     assert isinstance(fast_response, ModelResponse)
     assert isinstance(thorough_response, ModelResponse)
@@ -183,9 +170,7 @@ def test_invalid_reasoning_effort():
 
     # The error gets wrapped by the retry mechanism, so we catch the more general exception
     with pytest.raises(ALEARetryExhaustedError):
-        model.chat(
-            messages=[{"role": "user", "content": "Test"}], reasoning_effort="invalid"
-        )
+        model.chat(messages=[{"role": "user", "content": "Test"}], reasoning_effort="invalid")
 
 
 def test_invalid_verbosity():
@@ -210,7 +195,7 @@ def test_deprecated_max_tokens_warning():
 
 # def test with ignore_cache=True
 def test_simple_addition_ignore_cache(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is 2 + 2?",
@@ -219,20 +204,19 @@ def test_simple_addition_ignore_cache(openai_model: OpenAIModel):
     response: ModelResponse = openai_model.chat(messages=prompt, ignore_cache=True)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "4" in content, f"Expected '4' in the response, but got: {content}"
 
 
 def test_json_response(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Alice who is 30 years old.",
         },
     ]
-    response: JSONModelResponse = openai_model.json(
-        messages=prompt, system="Respond in JSON."
-    )
+    response: JSONModelResponse = openai_model.json(messages=prompt, system="Respond in JSON.")
 
     assert isinstance(response, JSONModelResponse)
     assert isinstance(response.data, dict)
@@ -241,15 +225,15 @@ def test_json_response(openai_model: OpenAIModel):
 
 
 def test_format_with_system_prompt(openai_model: OpenAIModel):
-    expected_messages: List[Dict[str, str]] = [
+    expected_messages: list[dict[str, str]] = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Hello"},
     ]
-    messages: List[Dict[str, str]] = [
+    messages: list[dict[str, str]] = [
         {"role": "user", "content": "Hello"},
     ]
     system_prompt: str = "You are a helpful assistant."
-    formatted_messages: List[Dict[str, str]] = openai_model.format(
+    formatted_messages: list[dict[str, str]] = openai_model.format(
         args=[], kwargs={"messages": messages, "system": system_prompt}
     )
 
@@ -258,7 +242,7 @@ def test_format_with_system_prompt(openai_model: OpenAIModel):
 
 
 def test_chat_with_system_prompt(openai_model: OpenAIModel):
-    messages: List[Dict[str, str]] = [
+    messages: list[dict[str, str]] = [
         {"role": "user", "content": "Hello"},
     ]
     system_prompt: str = "You are a helpful assistant."
@@ -303,15 +287,14 @@ def test_formatter_identity():
             return kwargs.pop("messages")
 
     openai_model = OpenAIModel(formatter=formatter)
-    response: ModelResponse = openai_model.chat(
-        messages=[{"role": "user", "content": "2+2=?"}]
-    )
+    response: ModelResponse = openai_model.chat(messages=[{"role": "user", "content": "2+2=?"}])
+    assert response.text is not None
     assert "4" in response.text or "four" in response.text.lower()
 
 
 @pytest.mark.asyncio
 async def test_chat_async(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is 3 + 3?",
@@ -320,21 +303,20 @@ async def test_chat_async(openai_model: OpenAIModel):
     response: ModelResponse = await openai_model.chat_async(messages=prompt)
 
     assert isinstance(response, ModelResponse)
+    assert response.text is not None
     content: str = response.text.strip()
     assert "6" in content, f"Expected '6' in the response, but got: {content}"
 
 
 @pytest.mark.asyncio
 async def test_json_async(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object with keys 'city' and 'population' for New York City with 8 million people.",
         },
     ]
-    response: JSONModelResponse = await openai_model.json_async(
-        messages=prompt, system="Respond in JSON."
-    )
+    response: JSONModelResponse = await openai_model.json_async(messages=prompt, system="Respond in JSON.")
 
     assert isinstance(response, JSONModelResponse)
     assert isinstance(response.data, dict)
@@ -346,9 +328,8 @@ def test_retry_wrapper_exhaustion(openai_model: OpenAIModel):
     def failing_function(*args, **kwargs):
         raise Exception("Simulated failure")
 
-    with patch.object(openai_model, "_chat", side_effect=failing_function):
-        with pytest.raises(ALEARetryExhaustedError):
-            openai_model.chat("Test message")
+    with patch.object(openai_model, "_chat", side_effect=failing_function), pytest.raises(ALEARetryExhaustedError):
+        openai_model.chat("Test message", ignore_cache=True)
 
 
 @pytest.mark.asyncio
@@ -358,13 +339,14 @@ async def test_retry_wrapper_async_exhaustion(openai_model: OpenAIModel):
 
     with patch.object(openai_model, "_chat_async", side_effect=failing_function):
         with pytest.raises(ALEARetryExhaustedError):
-            await openai_model.chat_async("Test message")
+            await openai_model.chat_async("Test message", ignore_cache=True)
 
 
 def test_cache_functionality(openai_model: OpenAIModel, tmp_path):
     openai_model.cache_path = tmp_path
+    openai_model.ignore_cache = False  # Enable caching for this test
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is the capital of France?",
@@ -384,8 +366,9 @@ def test_cache_functionality(openai_model: OpenAIModel, tmp_path):
 @pytest.mark.asyncio
 async def test_cache_functionality_async(openai_model: OpenAIModel, tmp_path):
     openai_model.cache_path = tmp_path
+    openai_model.ignore_cache = False  # Enable caching for this test
 
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "What is the capital of Germany?",
@@ -395,24 +378,22 @@ async def test_cache_functionality_async(openai_model: OpenAIModel, tmp_path):
     response1: ModelResponse = await openai_model.chat_async(messages=prompt)
     response2: ModelResponse = await openai_model.chat_async(messages=prompt)
 
+    assert response1.text is not None
+    assert response2.text is not None
     assert "Berlin" in response1.text and "Berlin" in response2.text
     assert len(list(tmp_path.glob("*.json.gz"))) == 1  # Check if cache file was created
 
 
-class PydanticTestModel(BaseModel):
-    name: str
-    age: int
-
-
 def test_pydantic_response(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Bob who is 25 years old.",
         },
     ]
-    response: PydanticTestModel = openai_model.pydantic(
-        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
+    response = cast(
+        PydanticTestModel,
+        openai_model.pydantic(messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel),
     )
 
     assert isinstance(response, PydanticTestModel)
@@ -422,14 +403,15 @@ def test_pydantic_response(openai_model: OpenAIModel):
 
 @pytest.mark.asyncio
 async def test_pydantic_async(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object with keys 'name' and 'age' for a person named Charlie who is 35 years old.",
         },
     ]
-    response: PydanticTestModel = await openai_model.pydantic_async(
-        messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel
+    response = cast(
+        PydanticTestModel,
+        await openai_model.pydantic_async(messages=prompt, system="Respond in JSON.", pydantic_model=PydanticTestModel),
     )
 
     assert isinstance(response, PydanticTestModel)
@@ -438,7 +420,7 @@ async def test_pydantic_async(openai_model: OpenAIModel):
 
 
 def test_missing_pydantic_model(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Give me a JSON object.",
@@ -451,7 +433,7 @@ def test_missing_pydantic_model(openai_model: OpenAIModel):
 def test_custom_model(openai_model: OpenAIModel):
     custom_model = "gpt-4o-mini"
     openai_model.model = custom_model
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Hello",
@@ -462,7 +444,7 @@ def test_custom_model(openai_model: OpenAIModel):
 
 
 def test_max_tokens(openai_model: OpenAIModel):
-    prompt: List[Dict[str, str]] = [
+    prompt: list[dict[str, str]] = [
         {
             "role": "user",
             "content": "Write a very long story.",
@@ -470,6 +452,7 @@ def test_max_tokens(openai_model: OpenAIModel):
     ]
     max_tokens = 50
     response: ModelResponse = openai_model.chat(messages=prompt, max_tokens=max_tokens)
+    assert response.text is not None
     assert len(response.text.split()) <= max_tokens
 
 
@@ -477,17 +460,11 @@ def test_invalid_api_key():
     # unset env value
     model = OpenAIModel(api_key="abc123")
     with pytest.raises(ALEAAuthenticationError):
-        print(
-            model.chat(
-                messages=[{"role": "user", "content": "Hello"}], ignore_cache=True
-            )
-        )
+        print(model.chat(messages=[{"role": "user", "content": "Hello"}], ignore_cache=True))
 
 
 def test_model_response_to_dict(openai_model: OpenAIModel):
-    response: ModelResponse = openai_model.chat(
-        messages=[{"role": "user", "content": "Hello"}]
-    )
+    response: ModelResponse = openai_model.chat(messages=[{"role": "user", "content": "Hello"}])
     response_dict = response.to_dict()
     assert isinstance(response_dict, dict)
     assert "choices" in response_dict
@@ -496,9 +473,7 @@ def test_model_response_to_dict(openai_model: OpenAIModel):
 
 
 def test_model_response_to_json(openai_model: OpenAIModel):
-    response: ModelResponse = openai_model.chat(
-        messages=[{"role": "user", "content": "Hello"}]
-    )
+    response: ModelResponse = openai_model.chat(messages=[{"role": "user", "content": "Hello"}])
     response_json = response.to_json()
     assert isinstance(response_json, str)
     assert "choices" in response_json
@@ -541,22 +516,16 @@ def test_o_series_models():
     """Test that O-series reasoning models are available."""
     from alea_llm_client.llms.constants import (
         O_SERIES_MODELS,
-        supports_reasoning_effort,
         requires_max_completion_tokens,
+        supports_reasoning_effort,
     )
 
     test_models = ["o1", "o1-mini", "o3", "o3-mini", "o4-mini", "o1-pro", "o3-pro"]
 
     for model_name in test_models:
-        assert model_name in O_SERIES_MODELS, (
-            f"{model_name} should be in O_SERIES_MODELS"
-        )
-        assert supports_reasoning_effort(model_name), (
-            f"{model_name} should support reasoning_effort"
-        )
-        assert requires_max_completion_tokens(model_name), (
-            f"{model_name} should require max_completion_tokens"
-        )
+        assert model_name in O_SERIES_MODELS, f"{model_name} should be in O_SERIES_MODELS"
+        assert supports_reasoning_effort(model_name), f"{model_name} should support reasoning_effort"
+        assert requires_max_completion_tokens(model_name), f"{model_name} should require max_completion_tokens"
 
         # Test model instantiation
         model = OpenAIModel(model=model_name)
@@ -566,12 +535,12 @@ def test_o_series_models():
 def test_specialized_models():
     """Test specialized models like computer use and realtime."""
     from alea_llm_client.llms.constants import (
+        AUDIO_MODELS,
         COMPUTER_USE_MODELS,
         REALTIME_MODELS,
-        AUDIO_MODELS,
+        supports_audio,
         supports_computer_use,
         supports_realtime,
-        supports_audio,
     )
 
     # Test computer use models
@@ -593,13 +562,13 @@ def test_specialized_models():
 def test_model_support_functions():
     """Test all model support detection functions."""
     from alea_llm_client.llms.constants import (
-        supports_reasoning_effort,
-        supports_verbosity,
+        requires_max_completion_tokens,
         supports_audio,
+        supports_computer_use,
         supports_grammar,
         supports_realtime,
-        supports_computer_use,
-        requires_max_completion_tokens,
+        supports_reasoning_effort,
+        supports_verbosity,
     )
 
     # Test GPT-5 capabilities
@@ -631,9 +600,7 @@ def test_deep_research_models():
     ]
 
     for model_name in research_models:
-        assert model_name in O_SERIES_MODELS, (
-            f"{model_name} should be in O_SERIES_MODELS"
-        )
+        assert model_name in O_SERIES_MODELS, f"{model_name} should be in O_SERIES_MODELS"
 
         # Test model instantiation
         model = OpenAIModel(model=model_name)
@@ -643,11 +610,11 @@ def test_deep_research_models():
 def test_model_defaults():
     """Test that default model selections are valid."""
     from alea_llm_client.llms.constants import (
-        OPENAI_DEFAULT_CHAT_MODEL,
-        OPENAI_DEFAULT_REASONING_MODEL,
-        OPENAI_DEFAULT_FAST_MODEL,
         GPT_5_MODELS,
         O_SERIES_MODELS,
+        OPENAI_DEFAULT_CHAT_MODEL,
+        OPENAI_DEFAULT_FAST_MODEL,
+        OPENAI_DEFAULT_REASONING_MODEL,
     )
 
     # Test defaults are in their respective model families

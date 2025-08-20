@@ -4,8 +4,8 @@ This module provides constants and validation for grammar-constrained generation
 supporting both Lark and Regex grammar syntax types.
 """
 
-from typing import Literal, Dict, Any, Optional
 from enum import Enum
+from typing import Any, Literal, Optional
 
 # Grammar syntax types
 GRAMMAR_SYNTAX_TYPES = ["lark", "regex"]
@@ -44,9 +44,7 @@ def validate_grammar_syntax(syntax: str) -> bool:
     return syntax in GRAMMAR_SYNTAX_TYPES
 
 
-def validate_grammar_definition(
-    definition: str, syntax: str
-) -> tuple[bool, Optional[str]]:
+def validate_grammar_definition(definition: str, syntax: str) -> tuple[bool, Optional[str]]:
     """Validate a grammar definition string.
 
     Args:
@@ -84,7 +82,7 @@ def validate_grammar_definition(
 
             re.compile(definition)
         except re.error as e:
-            return False, f"Invalid regex pattern: {str(e)}"
+            return False, f"Invalid regex pattern: {e!s}"
     elif syntax == "lark":
         # Basic Lark grammar validation (checking for common patterns)
         if not any(char in definition for char in [":", "|", '"', "'"]):
@@ -96,9 +94,7 @@ def validate_grammar_definition(
     return True, None
 
 
-def create_grammar_response_format(
-    syntax: GrammarSyntaxType, definition: str
-) -> Dict[str, Any]:
+def create_grammar_response_format(syntax: GrammarSyntaxType, definition: str) -> dict[str, Any]:
     """Create a grammar response format dictionary.
 
     Args:
@@ -127,7 +123,7 @@ def create_grammar_tool(
     definition: str,
     name: str = "grammar_response",
     description: str = "Grammar-constrained response",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a grammar tool for OpenAI Responses API.
 
     Args:
