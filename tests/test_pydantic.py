@@ -1,7 +1,9 @@
-# imports
+from typing import cast
+
 from pydantic import BaseModel
-from alea_llm_client import AnthropicModel, VLLMModel, OpenAIModel
-from alea_llm_client.llms.prompts.sections import format_prompt, format_instructions
+
+from alea_llm_client import AnthropicModel, OpenAIModel, VLLMModel
+from alea_llm_client.llms.prompts.sections import format_instructions, format_prompt
 
 
 class Person(BaseModel):
@@ -21,7 +23,7 @@ def test_pydantic_vllm():
     )
 
     model = VLLMModel()
-    person = model.pydantic(prompt, system="Respond in JSON.", pydantic_model=Person)
+    person = cast(Person, model.pydantic(prompt, system="Respond in JSON.", pydantic_model=Person))
 
     assert isinstance(person.name, str)
     assert isinstance(person.age, int)
@@ -39,7 +41,7 @@ def test_pydantic_openai():
     )
 
     model = OpenAIModel()
-    person = model.pydantic(prompt, system="Respond in JSON.", pydantic_model=Person)
+    person = cast(Person, model.pydantic(prompt, system="Respond in JSON.", pydantic_model=Person))
 
     assert isinstance(person.name, str)
     assert isinstance(person.age, int)
@@ -57,7 +59,7 @@ def test_pydantic_anthropic():
     )
 
     model = AnthropicModel()
-    person = model.pydantic(prompt, system="Respond in JSON.", pydantic_model=Person)
+    person = cast(Person, model.pydantic(prompt, system="Respond in JSON.", pydantic_model=Person))
 
     assert isinstance(person.name, str)
     assert isinstance(person.age, int)

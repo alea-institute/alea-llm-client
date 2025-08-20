@@ -23,9 +23,7 @@ def normalize_json_response(response: str) -> str:
         ValueError: If the cleaned response is not a valid JSON or JSONL.
     """
     # Remove backticks and language indicators
-    cleaned = re.sub(
-        r"^```(?:json)?\n?|\n?```$", "", response.strip(), flags=re.MULTILINE
-    )
+    cleaned = re.sub(r"^```(?:json)?\n?|\n?```$", "", response.strip(), flags=re.MULTILINE)
 
     # Attempt to parse as JSON
     try:
@@ -36,9 +34,7 @@ def normalize_json_response(response: str) -> str:
 
     # Try to parse from the first { or [
     try:
-        first_pos_list = [
-            pos for pos in (cleaned.find("{"), cleaned.find("[")) if pos >= 0
-        ]
+        first_pos_list = [pos for pos in (cleaned.find("{"), cleaned.find("[")) if pos >= 0]
         if not first_pos_list:
             raise ValueError(
                 "The cleaned response is not a valid JSON or JSONL object: %s",
@@ -53,14 +49,9 @@ def normalize_json_response(response: str) -> str:
 
     # Now try to trim from the last } or ]
     try:
-        last_pos_list = [
-            pos for pos in (cleaned.rfind("}"), cleaned.rfind("]")) if pos >= 0
-        ]
+        last_pos_list = [pos for pos in (cleaned.rfind("}"), cleaned.rfind("]")) if pos >= 0]
         if not last_pos_list:
-            raise ValueError(
-                "The cleaned response is not a valid JSON or JSONL object: %s"
-                % (cleaned,)
-            )
+            raise ValueError(f"The cleaned response is not a valid JSON or JSONL object: {cleaned}")
         last_pos = max(last_pos_list)
         cleaned = cleaned[: last_pos + 1]
         json.loads(cleaned)
@@ -75,7 +66,7 @@ def normalize_json_response(response: str) -> str:
                 json.loads(line)
         return cleaned
     except json.JSONDecodeError:
-        LOGGER.error(f"Invalid JSON or JSONL response: {cleaned}")
+        LOGGER.exception(f"Invalid JSON or JSONL response: {cleaned}")
         raise ValueError("The cleaned response is not a valid JSON or JSONL object.")
 
 

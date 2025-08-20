@@ -2,7 +2,6 @@
 This module provides a logger factory and default logger for the project.
 """
 
-# imports
 import logging
 import logging.handlers
 from pathlib import Path
@@ -15,9 +14,7 @@ if not DEFAULT_LOG_DIR.exists():
 DEFAULT_LOG_FILE = DEFAULT_LOG_DIR / "alea_llm_client.log"
 
 
-def setup_logger(
-    name: str, log_file: Optional[Path] = DEFAULT_LOG_FILE, level: int = logging.WARN
-) -> logging.Logger:
+def setup_logger(name: str, log_file: Optional[Path] = DEFAULT_LOG_FILE, level: int = logging.WARN) -> logging.Logger:
     """Set up and return a logger with the given name and configuration.
 
     Args:
@@ -32,9 +29,7 @@ def setup_logger(
     logger.setLevel(level)
 
     # Create a formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # Create a stream handler for console output
     console_handler = logging.StreamHandler()

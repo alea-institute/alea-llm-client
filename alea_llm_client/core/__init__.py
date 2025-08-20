@@ -3,19 +3,19 @@ Core functionality used across alea_llm_client modules.
 """
 
 from .exceptions import (
-    ALEAModelError,
-    ALEAError,
-    ALEARetryExhaustedError,
     ALEAAuthenticationError,
+    ALEAError,
+    ALEAModelError,
+    ALEARetryExhaustedError,
 )
-from .logging import LoggerMixin, setup_logger, DEFAULT_LOGGER
+from .logging import DEFAULT_LOGGER, LoggerMixin, setup_logger
 
 __all__ = [
-    "ALEAModelError",
-    "ALEAError",
-    "ALEARetryExhaustedError",
+    "DEFAULT_LOGGER",
     "ALEAAuthenticationError",
+    "ALEAError",
+    "ALEAModelError",
+    "ALEARetryExhaustedError",
     "LoggerMixin",
     "setup_logger",
-    "DEFAULT_LOGGER",
 ]

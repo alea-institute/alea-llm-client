@@ -15,7 +15,7 @@ import traceback
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 # packages
 import pydantic_core
@@ -23,16 +23,25 @@ from pydantic import BaseModel
 
 # project imports
 from alea_llm_client.core.exceptions import (
-    ALEARetryExhaustedError,
     ALEAAuthenticationError,
     ALEAModelError,
+    ALEARetryExhaustedError,
 )
 from alea_llm_client.core.logging import LoggerMixin
 from alea_llm_client.llms.utils.json import normalize_json_response
 
+# Type variable for Pydantic models
+T = TypeVar("T", bound=BaseModel)
+
 
 # Default keys to exclude from the cache key
-DEFAULT_EXCLUDE_KEYS = ("ignore_cache",)
+DEFAULT_EXCLUDE_KEYS = (
+    "ignore_cache",
+    "timeout",
+    "retry_limit",
+    "retry_delay",
+    "headers",  # Request headers don't affect model response content
+)
 
 
 # enum for response type: ModelResponse, JSONModelResponse, PydanticModelResponse
@@ -49,14 +58,20 @@ class ModelResponse:
     Attributes:
         choices (List[str]): A list of response choices from the model.
         metadata (Dict): Additional metadata about the response.
-        text (Optional[str]): The primary text response, if applicable.
+        text (str): The primary text response from the model.
+        thinking (Optional[str]): The thinking content from Claude models, if available.
+        reasoning_tokens (Optional[int]): Number of reasoning tokens used by o-series models.
+        content_blocks (List[Dict]): Raw content blocks from the API response.
     """
 
-    choices: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    text: Optional[str] = None
+    choices: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    text: str = ""
+    thinking: Optional[str] = None
+    reasoning_tokens: Optional[int] = None
+    content_blocks: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the ModelResponse to a dictionary.
 
         Returns:
@@ -83,7 +98,7 @@ class JSONModelResponse(ModelResponse):
         data (Dict): The structured JSON data returned by the model.
     """
 
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseAIModel(abc.ABC, LoggerMixin):
@@ -110,24 +125,25 @@ class BaseAIModel(abc.ABC, LoggerMixin):
 
     def __init__(
         self,
-        api_key: str,
+        api_key: Optional[str],
         model: str,
         endpoint: Optional[str] = None,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = None,
-        ignore_cache: bool = False,
+        ignore_cache: bool = True,
         retry_limit: int = 3,
         retry_delay: float = 1.0,
     ):
         """Initialize the BaseAIModel.
 
         Args:
-            api_key (str): The API key for authenticating with the model service.
+            api_key (Optional[str]): The API key for authenticating with the model service.
             model (str): The specific model identifier to use.
             endpoint (Optional[str]): The API endpoint URL, if applicable.
             formatter (Optional[Callable]): A function to format inputs/outputs.
             cache_path (Optional[Path]): The path to the cache directory.
             ignore_cache (bool): Whether to ignore the cache and always make a request.
+                Default: True (caching disabled).
             retry_limit (int): The number of times to retry the request on failure.
             retry_delay (float): The initial delay between retries, in seconds.
         """
@@ -188,9 +204,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             data = data.encode("utf-8")
         return hashlib.blake2b(data, digest_size=self.CACHE_DIGEST_SIZE).hexdigest()
 
-    def get_object_cache_path(
-        self, args: dict, exclude_keys: tuple[str, ...] = DEFAULT_EXCLUDE_KEYS
-    ) -> Path:
+    def get_object_cache_path(self, args: dict, exclude_keys: tuple[str, ...] = DEFAULT_EXCLUDE_KEYS) -> Path:
         """Generate a cache path for the given object.
 
         Args:
@@ -200,8 +214,20 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         Returns:
             Path: The cache path for the object.
         """
-        # get a string representation of a stable sorted tuple of the arguments
-        args_tuple = tuple((str(k), str(v)) for k, v in sorted(args.items()))
+        # Filter out excluded keys from args, including nested kwargs
+        filtered_args = {}
+        for k, v in args.items():
+            if k == "kwargs" and isinstance(v, dict):
+                # Filter excluded keys from nested kwargs
+                filtered_kwargs = {
+                    nested_k: nested_v for nested_k, nested_v in v.items() if nested_k not in exclude_keys
+                }
+                filtered_args[k] = filtered_kwargs
+            elif k not in exclude_keys:
+                filtered_args[k] = v
+
+        # get a string representation of a stable sorted tuple of the filtered arguments
+        args_tuple = tuple((str(k), str(v)) for k, v in sorted(filtered_args.items()))
         arg_str = str(args_tuple).encode("utf-8")
 
         # generate a short hash of the arguments to use as the cache key
@@ -246,10 +272,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         Returns:
             Optional[Union[dict, list]]: The parsed JSON data, if valid.
         """
-        if isinstance(data, bytes):
-            normalized_data = data.decode("utf-8")
-        else:
-            normalized_data = data
+        normalized_data = data.decode("utf-8") if isinstance(data, bytes) else data
 
         # normalize the JSON data
         normalized_data = normalize_json_response(normalized_data)
@@ -258,7 +281,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         try:
             return pydantic_core.from_json(normalized_data, allow_partial=True)
         except Exception as e:
-            self.logger.error(f"Error parsing JSON data: {str(e)}:\n{normalized_data}")
+            self.logger.exception(f"Error parsing JSON data: {e!s}:\n{normalized_data}")
             return None
 
     @abc.abstractmethod
@@ -274,7 +297,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         pass
 
     @abc.abstractmethod
-    def format(self, args: Any, kwargs: Any) -> List[Dict[str, str]]:
+    def format(self, args: Any, kwargs: Any) -> list[dict[str, str]]:
         """Format inputs or outputs using the specified formatter.
 
         Args:
@@ -289,9 +312,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         """
         pass
 
-    def _retry_wrapper(
-        self, func: Callable, response_type: ResponseType, *args: Any, **kwargs: Any
-    ) -> Any:
+    def _retry_wrapper(self, func: Callable, response_type: ResponseType, *args: Any, **kwargs: Any) -> Any:
         """Retry a function call a specified number of times on failure.
 
         Args:
@@ -310,10 +331,12 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             try:
                 # check the cache
                 ignore_cache = kwargs.pop("ignore_cache", None) or self.ignore_cache
-                pydantic_model: Optional[BaseModel] = kwargs.get("pydantic_model", None)
+                pydantic_model: Optional[BaseModel] = kwargs.get("pydantic_model")
                 cache_args = {
                     "response_type": response_type,
                     "model": self.model,
+                    "endpoint": self.endpoint,
+                    "formatter": str(self.formatter) if self.formatter else None,
                     "args": args,
                     "kwargs": kwargs.copy(),
                 }
@@ -325,7 +348,10 @@ class BaseAIModel(abc.ABC, LoggerMixin):
                         elif response_type == ResponseType.JSON:
                             return JSONModelResponse(**cached_response)
                         elif response_type == ResponseType.PYDANTIC:
-                            return pydantic_model.model_validate(cached_response)
+                            if pydantic_model is not None:
+                                return pydantic_model.model_validate(cached_response)
+                            else:
+                                raise ValueError("pydantic_model cannot be None for PYDANTIC response type")
                         else:
                             raise ValueError(f"Invalid return type: {response_type}")
 
@@ -340,25 +366,19 @@ class BaseAIModel(abc.ABC, LoggerMixin):
                         self.set_cached_object(cache_args, result.model_dump())
                 return result
             except ALEAAuthenticationError as e:
-                self.logger.error(f"Authentication error: {str(e)}")
-                raise e
+                self.logger.exception(f"Authentication error: {e!s}")
+                raise
             except ALEAModelError as e:
-                self.logger.error(f"Model error: {str(e)}")
-                raise e
+                self.logger.exception(f"Model error: {e!s}")
+                raise
             except Exception as e:
-                self.logger.warning(
-                    f"Attempt {attempt + 1} failed: {str(e)}\n{traceback.format_exc()}"
-                )
+                self.logger.warning(f"Attempt {attempt + 1} failed: {e!s}\n{traceback.format_exc()}")
                 kwargs["ignore_cache"] = True
                 if attempt == self.retry_limit - 1:
-                    raise ALEARetryExhaustedError(
-                        f"All {self.retry_limit} retry attempts failed"
-                    ) from e
+                    raise ALEARetryExhaustedError(f"All {self.retry_limit} retry attempts failed") from e
             time.sleep(self.retry_delay * (2**attempt))
 
-    async def _retry_wrapper_async(
-        self, func: Callable, response_type: ResponseType, *args: Any, **kwargs: Any
-    ) -> Any:
+    async def _retry_wrapper_async(self, func: Callable, response_type: ResponseType, *args: Any, **kwargs: Any) -> Any:
         """Retry an asynchronous function call a specified number of times on failure.
 
         Args:
@@ -377,10 +397,12 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             try:
                 # check the cache
                 ignore_cache = kwargs.pop("ignore_cache", None) or self.ignore_cache
-                pydantic_model: Optional[BaseModel] = kwargs.get("pydantic_model", None)
+                pydantic_model: Optional[BaseModel] = kwargs.get("pydantic_model")
                 cache_args = {
                     "response_type": response_type,
                     "model": self.model,
+                    "endpoint": self.endpoint,
+                    "formatter": str(self.formatter) if self.formatter else None,
                     "args": args,
                     "kwargs": kwargs.copy(),
                 }
@@ -392,7 +414,10 @@ class BaseAIModel(abc.ABC, LoggerMixin):
                         elif response_type == ResponseType.JSON:
                             return JSONModelResponse(**cached_response)
                         elif response_type == ResponseType.PYDANTIC:
-                            return pydantic_model.model_validate(cached_response)
+                            if pydantic_model is not None:
+                                return pydantic_model.model_validate(cached_response)
+                            else:
+                                raise ValueError("pydantic_model cannot be None for PYDANTIC response type")
 
                 # call the function
                 result = await func(*args, **kwargs)
@@ -403,22 +428,18 @@ class BaseAIModel(abc.ABC, LoggerMixin):
                         self.set_cached_object(cache_args, result.to_dict())
                     elif response_type == ResponseType.PYDANTIC:
                         self.set_cached_object(cache_args, result.model_dump())
-                return await func(*args, **kwargs)
+                return result
             except ALEAAuthenticationError as e:
-                self.logger.error(f"Authentication error: {str(e)}")
-                raise e
+                self.logger.exception(f"Authentication error: {e!s}")
+                raise
             except ALEAModelError as e:
-                self.logger.error(f"Model error: {str(e)}")
-                raise e
+                self.logger.exception(f"Model error: {e!s}")
+                raise
             except Exception as e:
-                self.logger.warning(
-                    f"Attempt {attempt + 1} failed: {str(e)}\n{traceback.format_exc()}"
-                )
+                self.logger.warning(f"Attempt {attempt + 1} failed: {e!s}\n{traceback.format_exc()}")
                 kwargs["ignore_cache"] = True
                 if attempt == self.retry_limit - 1:
-                    raise ALEARetryExhaustedError(
-                        f"All {self.retry_limit} retry attempts failed"
-                    ) from e
+                    raise ALEARetryExhaustedError(f"All {self.retry_limit} retry attempts failed") from e
             await asyncio.sleep(self.retry_delay * (2**attempt))
 
     # complete hooks
@@ -466,9 +487,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         Raises:
             AIModelError: If there's an error during the asynchronous completion process.
         """
-        return await self._retry_wrapper_async(
-            self._complete_async, ResponseType.TEXT, *args, **kwargs
-        )
+        return await self._retry_wrapper_async(self._complete_async, ResponseType.TEXT, *args, **kwargs)
 
     @abc.abstractmethod
     async def _complete_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
@@ -530,9 +549,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         Raises:
             AIModelError: If there's an error during the asynchronous chat completion process.
         """
-        return await self._retry_wrapper_async(
-            self._chat_async, ResponseType.TEXT, *args, **kwargs
-        )
+        return await self._retry_wrapper_async(self._chat_async, ResponseType.TEXT, *args, **kwargs)
 
     @abc.abstractmethod
     async def _chat_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
@@ -594,9 +611,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         Raises:
             AIModelError: If there's an error during the asynchronous JSON completion process.
         """
-        return await self._retry_wrapper_async(
-            self._json_async, ResponseType.JSON, *args, **kwargs
-        )
+        return await self._retry_wrapper_async(self._json_async, ResponseType.JSON, *args, **kwargs)
 
     @abc.abstractmethod
     async def _json_async(self, *args: Any, **kwargs: Any) -> JSONModelResponse:
@@ -614,7 +629,81 @@ class BaseAIModel(abc.ABC, LoggerMixin):
         """
         pass
 
-    def pydantic(self, *args: Any, **kwargs: Any) -> BaseModel:
+    def responses(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform a synchronous responses completion using OpenAI Responses API.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+                - input (str): The input text for the model.
+                - grammar (str, optional): Grammar definition for constrained output.
+                - grammar_syntax (str, optional): Grammar syntax type ("lark" or "regex"). Defaults to "lark".
+                - tools (List[Dict], optional): Custom tools to include.
+                - reasoning (Dict, optional): Reasoning configuration.
+                - Other standard parameters.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the responses completion process.
+        """
+        return self._retry_wrapper(self._responses, ResponseType.TEXT, *args, **kwargs)
+
+    @abc.abstractmethod
+    def _responses(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform a synchronous responses completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the responses completion process.
+        """
+        pass
+
+    async def responses_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform an asynchronous responses completion using OpenAI Responses API.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+                - input (str): The input text for the model.
+                - grammar (str, optional): Grammar definition for constrained output.
+                - grammar_syntax (str, optional): Grammar syntax type ("lark" or "regex"). Defaults to "lark".
+                - tools (List[Dict], optional): Custom tools to include.
+                - reasoning (Dict, optional): Reasoning configuration.
+                - Other standard parameters.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the asynchronous responses completion process.
+        """
+        return await self._retry_wrapper_async(self._responses_async, ResponseType.TEXT, *args, **kwargs)
+
+    @abc.abstractmethod
+    async def _responses_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """Perform an asynchronous responses completion.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            ModelResponse: The response from the responses completion.
+
+        Raises:
+            AIModelError: If there's an error during the asynchronous responses completion process.
+        """
+        pass
+
+    def pydantic(self, *args: Any, **kwargs: Any) -> T:
         """Perform a synchronous JSON completion with Pydantic validation.
 
         Args:
@@ -622,17 +711,15 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the Pydantic validation process.
         """
-        return self._retry_wrapper(
-            self._pydantic, ResponseType.PYDANTIC, *args, **kwargs
-        )
+        return self._retry_wrapper(self._pydantic, ResponseType.PYDANTIC, *args, **kwargs)
 
     @abc.abstractmethod
-    def _pydantic(self, *args: Any, **kwargs: Any) -> BaseModel:
+    def _pydantic(self, *args: Any, **kwargs: Any) -> T:
         """Perform a synchronous JSON completion with Pydantic validation.
 
         Args:
@@ -640,14 +727,14 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the Pydantic validation process.
         """
         pass
 
-    async def pydantic_async(self, *args: Any, **kwargs: Any) -> BaseModel:
+    async def pydantic_async(self, *args: Any, **kwargs: Any) -> T:
         """Perform an asynchronous JSON completion with Pydantic validation.
 
         Args:
@@ -655,17 +742,15 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the asynchronous Pydantic validation process.
         """
-        return await self._retry_wrapper_async(
-            self._pydantic_async, ResponseType.PYDANTIC, *args, **kwargs
-        )
+        return await self._retry_wrapper_async(self._pydantic_async, ResponseType.PYDANTIC, *args, **kwargs)
 
     @abc.abstractmethod
-    async def _pydantic_async(self, *args: Any, **kwargs: Any) -> BaseModel:
+    async def _pydantic_async(self, *args: Any, **kwargs: Any) -> T:
         """Perform an asynchronous JSON completion with Pydantic validation.
 
         Args:
@@ -673,7 +758,7 @@ class BaseAIModel(abc.ABC, LoggerMixin):
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            pydantic.BaseModel: The Pydantic model response from the completion.
+            T: The specific Pydantic model response from the completion.
 
         Raises:
             AIModelError: If there's an error during the asynchronous Pydantic validation process.

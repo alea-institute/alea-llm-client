@@ -1,51 +1,43 @@
 # SPDX-License-Identifier: (MIT)
-__version__ = "0.1.3"
+__version__ = "0.2.3"
 __author__ = "ALEA Institute (https://aleainstitute.ai)"
 __license__ = "MIT"
 __copyright__ = "Copyright 2024-2025, ALEA Institute"
 
 # Core models
-from .llms import (
-    BaseAIModel,
-    OpenAICompatibleModel,
-    VLLMModel,
-    GrokModel,
-    OpenAIModel,
-    AnthropicModel,
-    GoogleModel,
-    ResponseType,
-    ModelResponse,
-    JSONModelResponse,
-)
-
 # Error handling
 from .core import (
-    ALEARetryExhaustedError,
+    ALEAAuthenticationError,
     ALEAError,
     ALEAModelError,
-    ALEAAuthenticationError,
+    ALEARetryExhaustedError,
 )
 
 # Logging utilities
 from .core.logging import (
-    DEFAULT_LOGGER,
     DEFAULT_LOG_DIR,
     DEFAULT_LOG_FILE,
-    setup_logger,
+    DEFAULT_LOGGER,
     LoggerMixin,
+    setup_logger,
+)
+from .llms import (
+    AnthropicModel,
+    BaseAIModel,
+    GoogleModel,
+    GrokModel,
+    JSONModelResponse,
+    ModelResponse,
+    OpenAICompatibleModel,
+    OpenAIModel,
+    ResponseType,
+    VLLMModel,
 )
 
-# Prompting utilities
-from .llms.prompts.formatters import (
-    TokenType,
-    format_prompt as format_model_prompt,
-    format_prompt_llama3,
-)
+# Prompting utilities (public API)
 from .llms.prompts.sections import (
-    format_prompt_sections,
-    format_prompt,
     format_instructions,
-    format_section_content,
+    format_prompt,
 )
 
 # JSON utilities
@@ -55,37 +47,32 @@ from .llms.utils.json import (
 )
 
 __all__ = [
-    # Models
-    "BaseAIModel",
-    "OpenAICompatibleModel",
-    "GrokModel",
-    "VLLMModel",
-    "OpenAIModel",
-    "AnthropicModel",
-    "GoogleModel",
-    "ResponseType",
-    "ModelResponse",
-    "JSONModelResponse",
-    # Error handling
-    "ALEAModelError",
-    "ALEAError",
-    "ALEARetryExhaustedError",
-    "ALEAAuthenticationError",
     # Logging
     "DEFAULT_LOGGER",
     "DEFAULT_LOG_DIR",
     "DEFAULT_LOG_FILE",
-    "setup_logger",
+    "ALEAAuthenticationError",
+    "ALEAError",
+    # Error handling
+    "ALEAModelError",
+    "ALEARetryExhaustedError",
+    "AnthropicModel",
+    # Models
+    "BaseAIModel",
+    "GoogleModel",
+    "GrokModel",
+    "JSONModelResponse",
     "LoggerMixin",
-    # Prompt formatting
-    "TokenType",
-    "format_model_prompt",
-    "format_prompt_llama3",
-    "format_prompt_sections",
-    "format_prompt",
+    "ModelResponse",
+    "OpenAICompatibleModel",
+    "OpenAIModel",
+    "ResponseType",
+    "VLLMModel",
     "format_instructions",
-    "format_section_content",
+    # Prompt formatting
+    "format_prompt",
     # JSON utilities
     "normalize_json_response",
     "replace_jsons_refs_with_enum",
+    "setup_logger",
 ]

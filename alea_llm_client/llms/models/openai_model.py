@@ -6,22 +6,23 @@ and JSON completions using OpenAI's language models.
 """
 
 # Standard library imports
-import os
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+import httpx
 from pydantic import BaseModel
 
 # project imports
 from alea_llm_client.core.logging import LoggerMixin
 from alea_llm_client.llms.models.base_ai_model import (
     JSONModelResponse,
+    ModelResponse,
 )
 from alea_llm_client.llms.models.openai_compatible_model import OpenAICompatibleModel
+from alea_llm_client.llms.utils.api_keys import get_openai_api_key
 
 DEFAULT_ENDPOINT = "https://api.openai.com/"
 DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "openai"
-DEFAULT_KEY_PATH = Path.home() / ".alea" / "keys" / "openai"
 
 
 class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
@@ -35,8 +36,8 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-4o",
-        endpoint: Optional[str] = DEFAULT_ENDPOINT,
+        model: str = "gpt-5-chat-latest",
+        endpoint: str = DEFAULT_ENDPOINT,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
         **kwargs: Any,
@@ -60,12 +61,7 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
             cache_path=cache_path,
             **kwargs,
         )
-        if endpoint is None:
-            self.logger.info(f"Initialized OpenAIModel with model: {model}")
-        else:
-            self.logger.info(
-                f"Initialized OpenAIModel with model: {model} and endpoint: {endpoint}"
-            )
+        self.logger.info(f"Initialized OpenAIModel with model: {model} and endpoint: {endpoint}")
 
     def get_api_key(self) -> str:
         """
@@ -77,25 +73,7 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
         Raises:
             ValueError: If the OPENAI_API_KEY is not found in environment variables.
         """
-        # check if api_key is set
-        if self.init_kwargs.get("api_key", None):
-            return self.init_kwargs["api_key"]
-
-        self.logger.debug("Attempting to get OpenAI API key from environment variables")
-        api_key = os.environ.get("OPENAI_API_KEY", None)
-        if api_key:
-            return api_key
-
-        # try to load from key path
-        self.logger.debug("Attempting to get OpenAI API key from key file")
-        if DEFAULT_KEY_PATH.exists():
-            api_key = DEFAULT_KEY_PATH.read_text().strip()
-            if len(api_key) > 0:
-                return api_key
-
-        raise ValueError(
-            "OPENAI_API_KEY not found in environment variables or key file."
-        )
+        return get_openai_api_key(self.init_kwargs)
 
     def _json(self, *args: Any, **kwargs: Any) -> JSONModelResponse:
         """
@@ -156,3 +134,34 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
         # add response_format to kwargs and call super method
         kwargs["response_format"] = {"type": "json_object"}
         return await super()._pydantic_async(*args, **kwargs)
+
+    def _handle_chat_response(self, response: httpx.Response) -> ModelResponse:
+        """
+        Handle the response from the chat completion.
+        Enhanced to extract reasoning tokens for o-series models.
+
+        Args:
+            response: The response from the chat completion.
+
+        Returns:
+            The model response with reasoning tokens populated for o-series models.
+        """
+        self.logger.debug("Handling OpenAI chat response")
+        response_data = response.json()
+        choices = self._get_chat_choices(response_data)
+
+        # Extract usage information and check for reasoning tokens (o-series models)
+        usage = response_data.get("usage", {})
+        reasoning_tokens = usage.get("reasoning_tokens")
+
+        model_response = ModelResponse(
+            choices=choices,
+            metadata={"model": self.model, "usage": usage},
+            text=choices[0] if len(choices) > 0 else "",
+            reasoning_tokens=reasoning_tokens,
+        )
+
+        if reasoning_tokens:
+            self.logger.debug(f"OpenAI model response used {reasoning_tokens} reasoning tokens")
+
+        return model_response

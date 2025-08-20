@@ -7,24 +7,23 @@ This module provides an implementation of the BaseAIModel for the Google Vertex 
 import hashlib
 import os
 from pathlib import Path
-from typing import Any, Callable, Optional, List, Dict
+from typing import Any, Callable, Optional
 
 # packages
 import httpx
 from pydantic import BaseModel
 
 # Local imports
-from alea_llm_client.core.exceptions import ALEAModelError, ALEAAuthenticationError
+from alea_llm_client.core.exceptions import ALEAAuthenticationError, ALEAModelError
 from alea_llm_client.llms.models.base_ai_model import (
     BaseAIModel,
-    ModelResponse,
     JSONModelResponse,
+    ModelResponse,
 )
-
+from alea_llm_client.llms.utils.api_keys import get_google_api_key
 
 # default cache path if a custom path is not provided
-DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "google"
-DEFAULT_KEY_PATH = Path.home() / ".alea" / "keys" / "google"
+DEFAULT_CACHE_PATH = Path.home() / ".alea" / "cache" / "gemini"
 
 
 # set a default api key; do NOT prefix with sk for scanning false positives
@@ -38,41 +37,56 @@ class GoogleModel(BaseAIModel):
     """
     Google model implementation for the ALEA LLM client.
 
-    This module provides an implementation of the BaseAIModel for the Google Vertex API.
+    This module provides an implementation of the BaseAIModel for both Google AI Studio
+    (Generative AI) and Google Vertex AI APIs.
     """
 
     def __init__(
         self,
-        model: str,
-        endpoint: str,
+        model: str = "gemini-2.0-flash-exp",
+        endpoint: str = "https://generativelanguage.googleapis.com",
         api_key: Optional[str] = None,
         formatter: Optional[Callable[[str], str]] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
         **kwargs: Any,
     ):
         """
-        Initialize the OpenAICompatibleModel.
+        Initialize the GoogleModel.
 
         Args:
-            model (str): The model name.
-            endpoint (str): The API endpoint (the full endpoint including project and location)
-            api_key (str): The API key (access token for Vertex).
+            model (str): The model name (e.g., "gemini-2.0-flash", "gemini-1.5-pro").
+            endpoint (str): The API endpoint (default: Google AI Studio endpoint).
+            api_key (str): The API key (Gemini API key or Vertex access token).
             formatter (Callable): The formatter function.
             cache_path (Path): The cache path.
             **kwargs: Additional keyword arguments.
         """
         # normalize the endpoint to ensure no trailing slash
         endpoint = endpoint.strip().rstrip("/")
-        self.location_id = kwargs.get("location_id", "us-central1")
-        self.project_id = kwargs.get("project_id", None)
-        if not self.project_id:
-            raise ValueError("project_id is required for Google Vertex API.")
 
-        # append to the cache path
-        endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
-        model_hash = hashlib.blake2b(model.encode()).hexdigest()
-        cache_path = cache_path / endpoint_hash / model_hash
-        cache_path.mkdir(parents=True, exist_ok=True)
+        # Check if this is Vertex AI or Google AI Studio based on endpoint
+        self.is_vertex = "aiplatform.googleapis.com" in endpoint
+
+        if self.is_vertex:
+            # Vertex AI configuration
+            self.location_id = kwargs.get("location_id", os.environ.get("VERTEX_LOCATION_ID", "us-central1"))
+            self.project_id = kwargs.get("project_id", os.environ.get("VERTEX_PROJECT_ID", None))
+            if not self.project_id:
+                raise ValueError(
+                    "project_id is required for Google Vertex API. Set it as a parameter "
+                    "or via VERTEX_PROJECT_ID environment variable."
+                )
+        else:
+            # Google AI Studio configuration (new Gemini models)
+            self.location_id = None
+            self.project_id = None
+
+        # append to the cache path if cache_path is provided
+        if cache_path is not None:
+            endpoint_hash = hashlib.blake2b(endpoint.encode()).hexdigest()
+            model_hash = hashlib.blake2b(model.encode()).hexdigest()
+            cache_path = cache_path / endpoint_hash / model_hash
+            cache_path.mkdir(parents=True, exist_ok=True)
 
         # save the kwargs for later
         self.init_kwargs = kwargs.copy()
@@ -104,27 +118,7 @@ class GoogleModel(BaseAIModel):
         Returns:
             str: The API key.
         """
-        # check if api_key is set
-        if self.init_kwargs.get("api_key", None):
-            return self.init_kwargs["api_key"]
-
-        self.logger.debug(
-            "Attempting to get Google Vertex API key from environment variables"
-        )
-        api_key = os.environ.get("VERTEX_API_KEY", None)
-        if api_key:
-            return api_key
-
-        # try to load from key path
-        self.logger.debug("Attempting to get Google Vertex API key from key file")
-        if DEFAULT_KEY_PATH.exists():
-            api_key = DEFAULT_KEY_PATH.read_text().strip()
-            if len(api_key) > 0:
-                return api_key
-
-        raise ValueError(
-            "VERTEX_API_KEY not found in environment variables or key file."
-        )
+        return get_google_api_key(self.init_kwargs)
 
     def _initialize_client(self) -> httpx.Client:
         """
@@ -161,11 +155,15 @@ class GoogleModel(BaseAIModel):
         Returns:
             str: The completion endpoint.
         """
-        # return self.endpoint.rstrip("/") + ":generateContent"
-        return (
-            f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
-            + f"/publishers/google/models/{self.model}:generateContent"
-        )
+        if self.is_vertex:
+            # Vertex AI endpoint format
+            return (
+                f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
+                + f"/publishers/google/models/{self.model}:generateContent"
+            )
+        else:
+            # Google AI Studio endpoint format (new Gemini models)
+            return f"{self.endpoint}/v1beta/models/{self.model}:generateContent"
 
     def get_stream_endpoint(self) -> str:
         """
@@ -174,12 +172,17 @@ class GoogleModel(BaseAIModel):
         Returns:
             str: The stream endpoint.
         """
-        return (
-            f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
-            + f"/publishers/google/models/{self.model}:streamGenerateContent"
-        )
+        if self.is_vertex:
+            # Vertex AI endpoint format
+            return (
+                f"{self.endpoint}/v1/projects/{self.project_id}/locations/{self.location_id}"
+                + f"/publishers/google/models/{self.model}:streamGenerateContent"
+            )
+        else:
+            # Google AI Studio endpoint format (new Gemini models)
+            return f"{self.endpoint}/v1beta/models/{self.model}:streamGenerateContent"
 
-    def format(self, args: Any, kwargs: Any) -> List[Dict[str, str]]:
+    def format(self, args: Any, kwargs: Any) -> list[dict[str, str]]:
         """
         Format inputs or outputs using the specified formatter.
 
@@ -205,8 +208,21 @@ class GoogleModel(BaseAIModel):
                 self.logger.error("No messages provided for chat completion")
                 raise ValueError("No messages provided for chat completion.")
 
+        # Convert OpenAI-style messages to Google format
         formatted_messages = []
-        formatted_messages.extend(messages)
+        for msg in messages:
+            # Check if message is already in Google format (has "parts")
+            if "parts" in msg:
+                formatted_messages.append(msg)
+            # Convert from OpenAI format (has "content") to Google format
+            elif "content" in msg:
+                formatted_msg = {"role": msg["role"]}
+                # Convert content to parts format
+                formatted_msg["parts"] = [{"text": msg["content"]}]
+                formatted_messages.append(formatted_msg)
+            else:
+                # Pass through as-is if neither format is detected
+                formatted_messages.append(msg)
 
         self.logger.debug(f"Formatted messages: {formatted_messages}")
         return formatted_messages
@@ -225,16 +241,23 @@ class GoogleModel(BaseAIModel):
         # we must have a url to proceed
         url = kwargs.pop("url", args[0] if len(args) > 0 else None)
         if not url:
-            raise ValueError(
-                "No URL provided for request; must provide either as args[0] or url=... keyword arg."
-            )
+            raise ValueError("No URL provided for request; must provide either as args[0] or url=... keyword arg.")
+
+        # Google uses "systemInstruction" instead of "system"
+        if "system" in kwargs:
+            kwargs["systemInstruction"] = {"parts": [{"text": kwargs.pop("system")}]}
 
         # pop headers from kwargs
         headers = kwargs.pop("headers", {})
 
-        # set Authorization if not already set
-        if "Authorization" not in headers:
-            headers["Authorization"] = f"Bearer {self.get_api_key()}"
+        # set Authorization/API key header based on endpoint type
+        if self.is_vertex:
+            # Vertex AI uses Bearer token
+            if "Authorization" not in headers:
+                headers["Authorization"] = f"Bearer {self.get_api_key()}"
+        # Google AI Studio uses X-Goog-Api-Key header
+        elif "X-Goog-Api-Key" not in headers:
+            headers["X-Goog-Api-Key"] = self.get_api_key()
 
         if "Content-Type" not in headers:
             headers["Content-Type"] = "application/json"
@@ -252,16 +275,12 @@ class GoogleModel(BaseAIModel):
 
             # check for 400 to return the right ALEA error
             if response.status_code == 400:
-                error_message = (
-                    response.json().get("error", {}).get("message", response.json())
-                )
+                error_message = response.json().get("error", {}).get("message", response.json())
                 raise ALEAModelError(f"Model error: {error_message}")
 
             # check for 401 to return the right ALEA error
             if response.status_code == 401:
-                error_message = (
-                    response.json().get("error", {}).get("message", response.json())
-                )
+                error_message = response.json().get("error", {}).get("message", response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
 
             # check for 404
@@ -271,13 +290,13 @@ class GoogleModel(BaseAIModel):
             response.raise_for_status()
             return response
         except httpx.ConnectError as e:
-            self.logger.error(f"Error connecting to the API: {str(e)}")
-            raise ALEAModelError(f"Error connecting to the API: {str(e)}")
-        except (ALEAModelError, ALEAAuthenticationError) as e:
-            raise e
+            self.logger.exception(f"Error connecting to the API: {e!s}")
+            raise ALEAModelError(f"Error connecting to the API: {e!s}")
+        except (ALEAModelError, ALEAAuthenticationError):
+            raise
         except Exception as e:
-            self.logger.error(f"Error in request: {str(e)}")
-            raise ALEAModelError(f"Error in request: {str(e)}") from e
+            self.logger.exception(f"Error in request: {e!s}")
+            raise ALEAModelError(f"Error in request: {e!s}") from e
 
     async def _make_request_async(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """
@@ -293,16 +312,23 @@ class GoogleModel(BaseAIModel):
         # we must have a url to proceed
         url = kwargs.pop("url", args[0] if len(args) > 0 else None)
         if not url:
-            raise ValueError(
-                "No URL provided for request; must provide either as args[0] or url=... keyword arg."
-            )
+            raise ValueError("No URL provided for request; must provide either as args[0] or url=... keyword arg.")
+
+        # Google uses "systemInstruction" instead of "system"
+        if "system" in kwargs:
+            kwargs["systemInstruction"] = {"parts": [{"text": kwargs.pop("system")}]}
 
         # pop headers from kwargs
         headers = kwargs.pop("headers", {})
 
-        # set Authorization if not already set
-        if "Authorization" not in headers:
-            headers["Authorization"] = f"Bearer {self.get_api_key()}"
+        # set Authorization/API key header based on endpoint type
+        if self.is_vertex:
+            # Vertex AI uses Bearer token
+            if "Authorization" not in headers:
+                headers["Authorization"] = f"Bearer {self.get_api_key()}"
+        # Google AI Studio uses X-Goog-Api-Key header
+        elif "X-Goog-Api-Key" not in headers:
+            headers["X-Goog-Api-Key"] = self.get_api_key()
 
         if "Content-Type" not in headers:
             headers["Content-Type"] = "application/json"
@@ -320,16 +346,12 @@ class GoogleModel(BaseAIModel):
 
             # check for 400 to return the right ALEA error
             if response.status_code == 400:
-                error_message = (
-                    response.json().get("error", {}).get("message", response.json())
-                )
+                error_message = response.json().get("error", {}).get("message", response.json())
                 raise ALEAModelError(f"Model error: {error_message}")
 
             # check for 401 to return the right ALEA error
             if response.status_code == 401:
-                error_message = (
-                    response.json().get("error", {}).get("message", response.json())
-                )
+                error_message = response.json().get("error", {}).get("message", response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
 
             # check for 404
@@ -339,16 +361,16 @@ class GoogleModel(BaseAIModel):
             response.raise_for_status()
             return response
         except httpx.ConnectError as e:
-            self.logger.error(f"Error connecting to the API: {str(e)}")
-            raise ALEAModelError(f"Error connecting to the API: {str(e)}")
-        except (ALEAModelError, ALEAAuthenticationError) as e:
-            raise e
+            self.logger.exception(f"Error connecting to the API: {e!s}")
+            raise ALEAModelError(f"Error connecting to the API: {e!s}")
+        except (ALEAModelError, ALEAAuthenticationError):
+            raise
         except Exception as e:
-            self.logger.error(f"Error in asynchronous request: {str(e)}")
-            raise ALEAModelError(f"Error in asynchronous request: {str(e)}") from e
+            self.logger.exception(f"Error in asynchronous request: {e!s}")
+            raise ALEAModelError(f"Error in asynchronous request: {e!s}") from e
 
     @staticmethod
-    def _get_complete_choices(response_data: dict) -> List[str | dict]:
+    def _get_complete_choices(response_data: dict) -> list[str | dict]:
         """
         Get the response choices from the response data.
 
@@ -364,7 +386,7 @@ class GoogleModel(BaseAIModel):
         ]
 
     @staticmethod
-    def _get_chat_choices(response_data: dict) -> List[str | dict]:
+    def _get_chat_choices(response_data: dict) -> list[str | dict]:
         """
         Get the chat response choices from the response data.
 
@@ -589,9 +611,7 @@ class GoogleModel(BaseAIModel):
             )
         )
 
-    def _handle_pydantic_response(
-        self, response: httpx.Response, pydantic_model: BaseModel
-    ) -> BaseModel:
+    def _handle_pydantic_response(self, response: httpx.Response, pydantic_model: BaseModel) -> BaseModel:
         """
         Handle the response from the Pydantic completion.
 
@@ -678,3 +698,33 @@ class GoogleModel(BaseAIModel):
             ),
             pydantic_model,
         )
+
+    def _responses(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """
+        Synchronous responses completion method.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            The response from the responses completion.
+        """
+        self.logger.debug("Initiating synchronous responses completion")
+        # For Google AI, responses completion is the same as chat completion
+        return self._chat(*args, **kwargs)
+
+    async def _responses_async(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        """
+        Asynchronous responses completion method.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            The response from the responses completion.
+        """
+        self.logger.debug("Initiating asynchronous responses completion")
+        # For Google AI, responses completion is the same as chat completion
+        return await self._chat_async(*args, **kwargs)
