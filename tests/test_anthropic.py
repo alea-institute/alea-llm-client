@@ -212,8 +212,8 @@ def test_thinking_parameter_validation():
 
 
 def test_claude_3_7_thinking():
-    """Test Claude 3.7 thinking capabilities."""
-    model = AnthropicModel(model="claude-3-7-sonnet-latest")
+    """Test thinking with a current model (3.7 is deprecated, use sonnet 4.6)."""
+    model = AnthropicModel(model="claude-sonnet-4-6")
 
     prompt: list[dict[str, str]] = [
         {
@@ -228,10 +228,10 @@ def test_claude_3_7_thinking():
     assert response.text is not None
     assert len(response.text) > 0
 
-    # Claude 3.7 should also support thinking
+    # Thinking should be available
     if response.thinking:
         assert len(response.thinking) > 0
-        print("Claude 3.7 thinking capability confirmed")
+        print("Thinking capability confirmed")
 
 
 def test_content_blocks_parsing():
@@ -517,7 +517,7 @@ def test_missing_pydantic_model(anthropic_model: AnthropicModel):
 
 
 def test_custom_model(anthropic_model: AnthropicModel):
-    custom_model = "claude-3-opus-20240229"
+    custom_model = "claude-sonnet-4-5"
     anthropic_model.model = custom_model
     prompt: list[dict[str, str]] = [
         {
@@ -1002,6 +1002,51 @@ def test_output_effort_constants():
     from alea_llm_client.llms.constants import OUTPUT_EFFORT_VALUES
 
     assert OUTPUT_EFFORT_VALUES == ["low", "medium", "high", "max"]
+
+
+def test_deprecated_model_warning():
+    """Test that deprecated models emit a DeprecationWarning."""
+    import warnings
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        AnthropicModel(model="claude-3-5-sonnet-20241022")
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)
+        assert "deprecated" in str(w[0].message).lower()
+        assert "claude-sonnet-4-6" in str(w[0].message)
+
+
+def test_deprecated_model_404_error():
+    """Test that deprecated models give a clear error with replacement suggestion."""
+    import warnings
+
+    from alea_llm_client.core.exceptions import ALEAModelError
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        model = AnthropicModel(model="claude-3-5-sonnet-20241022")
+
+    with pytest.raises(ALEAModelError) as exc_info:
+        model.chat(messages=[{"role": "user", "content": "Test"}])
+
+    # The error should mention the replacement
+    assert "deprecated" in str(exc_info.value).lower()
+    assert "claude-sonnet-4-6" in str(exc_info.value)
+
+
+def test_deprecation_replacements():
+    """Test the deprecation replacement mapping."""
+    from alea_llm_client.llms.constants import get_model_replacement, is_deprecated
+
+    assert is_deprecated("claude-3-5-sonnet-20241022")
+    assert get_model_replacement("claude-3-5-sonnet-20241022") == "claude-sonnet-4-6"
+
+    assert is_deprecated("claude-3-opus-20240229")
+    assert get_model_replacement("claude-3-opus-20240229") == "claude-opus-4-6"
+
+    assert not is_deprecated("claude-sonnet-4-6")
+    assert get_model_replacement("claude-sonnet-4-6") is None
 
 
 def test_updated_defaults():

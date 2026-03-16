@@ -6,6 +6,7 @@ and JSON completions using Anthropic's language models.
 """
 
 # Standard library imports
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -16,6 +17,7 @@ from alea_llm_client.core.exceptions import ALEAAuthenticationError, ALEAModelEr
 
 # project imports
 from alea_llm_client.core.logging import LoggerMixin
+from alea_llm_client.llms.constants.anthropic_models import get_model_replacement, is_deprecated
 from alea_llm_client.llms.models.base_ai_model import (
     BaseAIModel,
     JSONModelResponse,
@@ -81,6 +83,15 @@ class AnthropicModel(BaseAIModel, LoggerMixin):
             **kwargs,
         )
         self.logger.info(f"Initialized AnthropicModel with model: {model} and endpoint: {endpoint}")
+
+        # Warn about deprecated models
+        if is_deprecated(model):
+            replacement = get_model_replacement(model)
+            warnings.warn(
+                f"Model '{model}' is deprecated and may not be available. Use '{replacement}' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     def get_api_key(self) -> str:
         """
@@ -237,6 +248,16 @@ class AnthropicModel(BaseAIModel, LoggerMixin):
                 error_message = response.json().get("error", {}).get("message", response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
 
+            # check for 404 with deprecation hint
+            if response.status_code == 404:
+                replacement = get_model_replacement(self.model)
+                if replacement:
+                    raise ALEAModelError(
+                        f"Model '{self.model}' returned 404 (Not Found). "
+                        f"This model has been deprecated. Use '{replacement}' instead."
+                    )
+                raise ALEAModelError(f"Model not found: {self.model}")
+
             response.raise_for_status()
             return response
         except (ALEAModelError, ALEAAuthenticationError):
@@ -363,6 +384,16 @@ class AnthropicModel(BaseAIModel, LoggerMixin):
             if response.status_code == 401:
                 error_message = response.json().get("error", {}).get("message", response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
+
+            # check for 404 with deprecation hint
+            if response.status_code == 404:
+                replacement = get_model_replacement(self.model)
+                if replacement:
+                    raise ALEAModelError(
+                        f"Model '{self.model}' returned 404 (Not Found). "
+                        f"This model has been deprecated. Use '{replacement}' instead."
+                    )
+                raise ALEAModelError(f"Model not found: {self.model}")
 
             response.raise_for_status()
             return response

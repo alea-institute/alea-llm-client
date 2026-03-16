@@ -118,6 +118,42 @@ SONNET_MODELS = _get_anthropic_models("sonnet")
 OPUS_MODELS = _get_anthropic_models("opus")
 HAIKU_MODELS = _get_anthropic_models("haiku")
 
+# Deprecated models and their recommended replacements
+DEPRECATED_MODEL_REPLACEMENTS: dict[str, str] = {
+    # Claude 3.5 Sonnet → Claude Sonnet 4.6
+    "claude-3-5-sonnet-20241022": "claude-sonnet-4-6",
+    "claude-3-5-sonnet-20240620": "claude-sonnet-4-6",
+    "claude-3-5-sonnet-latest": "claude-sonnet-4-6",
+    # Claude 3.7 Sonnet → Claude Sonnet 4.6
+    "claude-3-7-sonnet-20250219": "claude-sonnet-4-6",
+    "claude-3-7-sonnet-latest": "claude-sonnet-4-6",
+    # Claude 3.5 Haiku → Claude Haiku 4.5
+    "claude-3-5-haiku-20241022": "claude-haiku-4-5",
+    "claude-3-5-haiku-latest": "claude-haiku-4-5",
+    # Claude 3 Opus → Claude Opus 4.6
+    "claude-3-opus-20240229": "claude-opus-4-6",
+    "claude-3-opus-latest": "claude-opus-4-6",
+    # Claude 3 Haiku → Claude Haiku 4.5
+    "claude-3-haiku-20240307": "claude-haiku-4-5",
+}
+
+
+def get_model_replacement(model: str) -> str | None:
+    """Get the recommended replacement for a deprecated model.
+
+    Args:
+        model: The model name to check.
+
+    Returns:
+        The replacement model name, or None if not deprecated.
+    """
+    return DEPRECATED_MODEL_REPLACEMENTS.get(model)
+
+
+def is_deprecated(model: str) -> bool:
+    """Check if a model is deprecated."""
+    return model in DEPRECATED_MODEL_REPLACEMENTS
+
 
 # Dynamic thinking-enabled models
 def _get_thinking_models() -> list[str]:

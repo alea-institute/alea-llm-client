@@ -1899,10 +1899,10 @@
         }
       },
       "defaults": {
-        "chat": "claude-sonnet-4-20250514",
-        "reasoning": "claude-opus-4-20250514",
-        "fast": "claude-3-5-haiku-20241022",
-        "thinking": "claude-sonnet-4-20250514"
+        "chat": "claude-sonnet-4-6",
+        "reasoning": "claude-opus-4-6",
+        "fast": "claude-haiku-4-5",
+        "thinking": "claude-sonnet-4-6"
       }
     },
     "google": {
