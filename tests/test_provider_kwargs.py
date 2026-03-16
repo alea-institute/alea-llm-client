@@ -137,8 +137,22 @@ def test_anthropic_tier_standard():
     assert kwargs == {"service_tier": "standard_only"}
 
 
+def test_anthropic_haiku_effort_noop():
+    """Haiku doesn't support output_config.effort."""
+    model = AnthropicModel(model="claude-haiku-4-5")
+    kwargs = get_llm_kwargs(model, effort="low")
+    assert kwargs == {}
+
+
+def test_anthropic_haiku_tier_ok():
+    """Haiku supports service_tier."""
+    model = AnthropicModel(model="claude-haiku-4-5")
+    kwargs = get_llm_kwargs(model, tier="flex")
+    assert kwargs == {"service_tier": "auto"}
+
+
 def test_anthropic_string():
-    """Anthropic string provider works (all models support these params)."""
+    """Anthropic string provider assumes latest (supports effort)."""
     kwargs = get_llm_kwargs("anthropic", effort="low", tier="flex")
     assert kwargs == {"output_config": {"effort": "low"}, "service_tier": "auto"}
 

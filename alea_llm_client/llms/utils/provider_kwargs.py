@@ -47,6 +47,14 @@ def _openai_supports_tier(model_name: str | None) -> bool:
     return model_name.startswith(("gpt-5", "o1", "o3", "o4"))
 
 
+def _anthropic_supports_effort(model_name: str | None) -> bool:
+    """Check if an Anthropic model supports output_config.effort."""
+    if model_name is None:
+        return True  # assume latest when no model instance
+    # Haiku models don't support the effort parameter
+    return "haiku" not in model_name
+
+
 def _google_supports_thinking(model_name: str | None) -> bool:
     """Check if a Google model supports thinking_level."""
     if model_name is None:
@@ -154,8 +162,7 @@ def get_llm_kwargs(
             kwargs["service_tier"] = _TIER_OPENAI[tier]
 
     elif provider_name == "anthropic":
-        # Anthropic output_config and service_tier work on all current models
-        if effort is not None:
+        if effort is not None and _anthropic_supports_effort(model_name):
             kwargs["output_config"] = {"effort": _EFFORT_ANTHROPIC[effort]}
         if tier is not None:
             kwargs["service_tier"] = _TIER_ANTHROPIC[tier]
