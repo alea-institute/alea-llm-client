@@ -179,7 +179,7 @@ def anthropic_model():
 
 @pytest.fixture
 def openai_model():
-    model = OpenAIModel(model="gpt-5")
+    model = OpenAIModel(model="gpt-5.4")
     return RateLimitedModel(model, "openai")
 
 

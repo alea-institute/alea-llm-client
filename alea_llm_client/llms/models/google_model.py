@@ -407,7 +407,11 @@ class GoogleModel(BaseAIModel):
             The response choices.
         """
         return [
-            candidate.get("content", {}).get("parts", [])[0].get("text", "")
+            (
+                candidate.get("content", {}).get("parts", [{}])[0].get("text", "")
+                if candidate.get("content", {}).get("parts")
+                else ""
+            )
             for candidate in response_data.get("candidates", [])
         ]
 
@@ -423,7 +427,11 @@ class GoogleModel(BaseAIModel):
             The response choices.
         """
         return [
-            candidate.get("content", {}).get("parts", [])[0].get("text", "")
+            (
+                candidate.get("content", {}).get("parts", [{}])[0].get("text", "")
+                if candidate.get("content", {}).get("parts")
+                else ""
+            )
             for candidate in response_data.get("candidates", [])
         ]
 

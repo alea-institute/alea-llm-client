@@ -8,7 +8,6 @@ from conftest import PydanticTestModel
 from alea_llm_client import JSONModelResponse, ModelResponse, OpenAIModel
 from alea_llm_client.core.exceptions import (
     ALEAAuthenticationError,
-    ALEAModelError,
     ALEARetryExhaustedError,
 )
 
@@ -181,16 +180,17 @@ def test_invalid_verbosity():
         model.chat(messages=[{"role": "user", "content": "Test"}], verbosity="invalid")
 
 
-def test_deprecated_max_tokens_warning():
-    """Test that max_tokens is not supported for o-series models."""
+def test_max_tokens_auto_conversion():
+    """Test that max_tokens is auto-converted to max_completion_tokens for o-series/GPT-5 models."""
     model = OpenAIModel(model="o3-mini")
 
-    # This should raise an error since o-series models don't support max_tokens
-    with pytest.raises(ALEAModelError):
-        model.chat(
-            messages=[{"role": "user", "content": "Hello"}],
-            max_tokens=50,  # Not supported parameter for o-series
-        )
+    # max_tokens should be auto-converted to max_completion_tokens
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "Say hi"}],
+        max_tokens=500,
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
 
 
 # def test with ignore_cache=True

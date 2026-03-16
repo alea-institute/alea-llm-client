@@ -253,15 +253,22 @@ def test_unset_api_key():
     # Store original environment variables
     original_google_key = os.environ.get("GOOGLE_API_KEY", "")
     original_vertex_key = os.environ.get("VERTEX_API_KEY", "")
+    original_gemini_key = os.environ.get("GEMINI_API_KEY", "")
     os.environ["GOOGLE_API_KEY"] = ""
     os.environ["VERTEX_API_KEY"] = ""
+    os.environ["GEMINI_API_KEY"] = ""
 
-    # Temporarily rename the key file if it exists
-    key_path = Path.home() / ".alea" / "keys" / "gemini"
-    temp_path = key_path.with_suffix(".tmp")
-    key_exists = key_path.exists()
-    if key_exists:
-        key_path.rename(temp_path)
+    # Temporarily rename the key files if they exist
+    key_paths = [
+        Path.home() / ".alea" / "keys" / "gemini",
+        Path.home() / ".alea" / "keys" / "google",
+    ]
+    renamed = []
+    for key_path in key_paths:
+        if key_path.exists():
+            temp_path = key_path.with_suffix(".tmp")
+            key_path.rename(temp_path)
+            renamed.append((temp_path, key_path))
 
     try:
         with pytest.raises(ValueError) as exc_info:
@@ -271,11 +278,12 @@ def test_unset_api_key():
         error_msg = str(exc_info.value)
         assert "Google API key not found" in error_msg
     finally:
-        # Restore the key file
-        if key_exists:
+        # Restore the key files
+        for temp_path, key_path in renamed:
             temp_path.rename(key_path)
         os.environ["GOOGLE_API_KEY"] = original_google_key
         os.environ["VERTEX_API_KEY"] = original_vertex_key
+        os.environ["GEMINI_API_KEY"] = original_gemini_key
 
 
 # ========== New model tests ==========

@@ -248,13 +248,13 @@ class OpenAICompatibleModel(BaseAIModel):
             request_body["max_completion_tokens"] = kwargs.pop("max_completion_tokens")
             self.logger.debug("Using max_completion_tokens parameter")
         elif "max_tokens" in kwargs:
-            # Check if this is an o-series model that requires max_completion_tokens
-            if any(self.model.startswith(prefix) for prefix in ["o1", "o3", "o4"]):
-                self.logger.warning(
-                    f"Model {self.model} prefers max_completion_tokens over max_tokens. "
-                    "Consider using max_completion_tokens instead."
-                )
-            request_body["max_tokens"] = kwargs.pop("max_tokens")
+            max_tokens_val = kwargs.pop("max_tokens")
+            # Auto-convert max_tokens to max_completion_tokens for models that require it
+            if any(self.model.startswith(prefix) for prefix in ["o1", "o3", "o4", "gpt-5"]):
+                request_body["max_completion_tokens"] = max_tokens_val
+                self.logger.debug(f"Auto-converted max_tokens to max_completion_tokens for {self.model}")
+            else:
+                request_body["max_tokens"] = max_tokens_val
 
         # Remove client-side only parameters that shouldn't be sent to API
         client_only_params = ["timeout"]
@@ -360,13 +360,13 @@ class OpenAICompatibleModel(BaseAIModel):
             request_body["max_completion_tokens"] = kwargs.pop("max_completion_tokens")
             self.logger.debug("Using max_completion_tokens parameter")
         elif "max_tokens" in kwargs:
-            # Check if this is an o-series model that requires max_completion_tokens
-            if any(self.model.startswith(prefix) for prefix in ["o1", "o3", "o4"]):
-                self.logger.warning(
-                    f"Model {self.model} prefers max_completion_tokens over max_tokens. "
-                    "Consider using max_completion_tokens instead."
-                )
-            request_body["max_tokens"] = kwargs.pop("max_tokens")
+            max_tokens_val = kwargs.pop("max_tokens")
+            # Auto-convert max_tokens to max_completion_tokens for models that require it
+            if any(self.model.startswith(prefix) for prefix in ["o1", "o3", "o4", "gpt-5"]):
+                request_body["max_completion_tokens"] = max_tokens_val
+                self.logger.debug(f"Auto-converted max_tokens to max_completion_tokens for {self.model}")
+            else:
+                request_body["max_tokens"] = max_tokens_val
 
         # Remove client-side only parameters that shouldn't be sent to API
         client_only_params = ["timeout"]
