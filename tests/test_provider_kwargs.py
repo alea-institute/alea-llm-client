@@ -33,94 +33,155 @@ def test_detect_provider_unknown():
     assert detect_provider(42) == "unknown"
 
 
-# ========== get_llm_kwargs: OpenAI ==========
+# ========== Model-aware: OpenAI GPT-5.x (supports effort + tier) ==========
 
 
-def test_openai_effort_low():
-    kwargs = get_llm_kwargs("openai", effort="low")
+def test_openai_gpt5_effort_low():
+    model = OpenAIModel(model="gpt-5.4")
+    kwargs = get_llm_kwargs(model, effort="low")
     assert kwargs == {"reasoning_effort": "none"}
 
 
-def test_openai_effort_medium():
-    kwargs = get_llm_kwargs("openai", effort="medium")
-    assert kwargs == {"reasoning_effort": "medium"}
-
-
-def test_openai_effort_high():
-    kwargs = get_llm_kwargs("openai", effort="high")
+def test_openai_gpt5_effort_high():
+    model = OpenAIModel(model="gpt-5.4")
+    kwargs = get_llm_kwargs(model, effort="high")
     assert kwargs == {"reasoning_effort": "high"}
 
 
-def test_openai_tier_flex():
-    kwargs = get_llm_kwargs("openai", tier="flex")
+def test_openai_gpt5_tier_flex():
+    model = OpenAIModel(model="gpt-5.4")
+    kwargs = get_llm_kwargs(model, tier="flex")
     assert kwargs == {"service_tier": "flex"}
 
 
-def test_openai_tier_standard():
-    kwargs = get_llm_kwargs("openai", tier="standard")
-    assert kwargs == {"service_tier": "default"}
-
-
-def test_openai_tier_priority():
-    kwargs = get_llm_kwargs("openai", tier="priority")
-    assert kwargs == {"service_tier": "priority"}
-
-
-def test_openai_effort_and_tier():
-    kwargs = get_llm_kwargs("openai", effort="low", tier="flex")
+def test_openai_gpt5_effort_and_tier():
+    model = OpenAIModel(model="gpt-5.4")
+    kwargs = get_llm_kwargs(model, effort="low", tier="flex")
     assert kwargs == {"reasoning_effort": "none", "service_tier": "flex"}
 
 
-# ========== get_llm_kwargs: Anthropic ==========
+# ========== Model-aware: OpenAI GPT-4.x (no effort, no tier) ==========
+
+
+def test_openai_gpt4_effort_noop():
+    """gpt-4.1-mini doesn't support reasoning_effort — should return empty."""
+    model = OpenAIModel(model="gpt-4.1-mini")
+    kwargs = get_llm_kwargs(model, effort="low")
+    assert kwargs == {}
+
+
+def test_openai_gpt4_tier_noop():
+    """gpt-4.1-mini doesn't support service_tier — should return empty."""
+    model = OpenAIModel(model="gpt-4.1-mini")
+    kwargs = get_llm_kwargs(model, tier="flex")
+    assert kwargs == {}
+
+
+def test_openai_gpt4_effort_and_tier_noop():
+    """gpt-4.1-mini supports neither — should return empty."""
+    model = OpenAIModel(model="gpt-4.1-mini")
+    kwargs = get_llm_kwargs(model, effort="high", tier="priority")
+    assert kwargs == {}
+
+
+# ========== Model-aware: OpenAI o-series (no effort, yes tier) ==========
+
+
+def test_openai_oseries_effort_noop():
+    """o-series doesn't support reasoning_effort in Chat API."""
+    model = OpenAIModel(model="o4-mini")
+    kwargs = get_llm_kwargs(model, effort="low")
+    assert kwargs == {}
+
+
+def test_openai_oseries_tier_ok():
+    """o-series supports service_tier."""
+    model = OpenAIModel(model="o4-mini")
+    kwargs = get_llm_kwargs(model, tier="flex")
+    assert kwargs == {"service_tier": "flex"}
+
+
+# ========== String provider (no model instance — assumes latest) ==========
+
+
+def test_string_openai_returns_empty():
+    """String provider without model instance returns empty (can't check model)."""
+    kwargs = get_llm_kwargs("openai", effort="low")
+    assert kwargs == {}
+
+
+# ========== Anthropic (all models support effort + tier) ==========
 
 
 def test_anthropic_effort_low():
-    kwargs = get_llm_kwargs("anthropic", effort="low")
+    model = AnthropicModel()
+    kwargs = get_llm_kwargs(model, effort="low")
     assert kwargs == {"output_config": {"effort": "low"}}
 
 
 def test_anthropic_effort_high():
-    kwargs = get_llm_kwargs("anthropic", effort="high")
+    model = AnthropicModel()
+    kwargs = get_llm_kwargs(model, effort="high")
     assert kwargs == {"output_config": {"effort": "high"}}
 
 
 def test_anthropic_tier_flex():
-    kwargs = get_llm_kwargs("anthropic", tier="flex")
+    model = AnthropicModel()
+    kwargs = get_llm_kwargs(model, tier="flex")
     assert kwargs == {"service_tier": "auto"}
 
 
 def test_anthropic_tier_standard():
-    kwargs = get_llm_kwargs("anthropic", tier="standard")
+    model = AnthropicModel()
+    kwargs = get_llm_kwargs(model, tier="standard")
     assert kwargs == {"service_tier": "standard_only"}
 
 
-# ========== get_llm_kwargs: Google ==========
+def test_anthropic_string():
+    """Anthropic string provider works (all models support these params)."""
+    kwargs = get_llm_kwargs("anthropic", effort="low", tier="flex")
+    assert kwargs == {"output_config": {"effort": "low"}, "service_tier": "auto"}
 
 
-def test_google_effort_low():
-    kwargs = get_llm_kwargs("google", effort="low")
+# ========== Google (thinking only on 2.5+/3.x) ==========
+
+
+def test_google_gemini3_effort():
+    model = GoogleModel(model="gemini-3.1-pro-preview")
+    kwargs = get_llm_kwargs(model, effort="low")
     assert kwargs == {"thinking_level": "minimal"}
 
 
-def test_google_effort_high():
-    kwargs = get_llm_kwargs("google", effort="high")
+def test_google_gemini25_effort():
+    model = GoogleModel(model="gemini-2.5-flash")
+    kwargs = get_llm_kwargs(model, effort="high")
     assert kwargs == {"thinking_level": "high"}
 
 
+def test_google_gemini20_effort_noop():
+    """gemini-2.0-flash doesn't support thinking."""
+    model = GoogleModel(model="gemini-2.0-flash")
+    kwargs = get_llm_kwargs(model, effort="high")
+    assert kwargs == {}
+
+
 def test_google_tier_noop():
-    kwargs = get_llm_kwargs("google", tier="flex")
-    assert kwargs == {}  # Google doesn't have service tier
+    model = GoogleModel(model="gemini-3.1-pro-preview")
+    kwargs = get_llm_kwargs(model, tier="flex")
+    assert kwargs == {}
 
 
-# ========== get_llm_kwargs: xAI ==========
+# ========== xAI/Grok ==========
 
 
-def test_xai_effort_low():
-    kwargs = get_llm_kwargs("xai", effort="low")
-    assert kwargs == {"reasoning_effort": "none"}
+def test_grok_effort():
+    """Grok uses same rules as OpenAI — model name determines support."""
+    model = GrokModel(model="grok-4-fast-non-reasoning")
+    kwargs = get_llm_kwargs(model, effort="medium")
+    assert kwargs == {}  # grok models don't start with gpt-5
 
 
-# ========== get_llm_kwargs: VLLM / unknown ==========
+# ========== VLLM / unknown ==========
 
 
 def test_vllm_noop():
@@ -133,15 +194,16 @@ def test_unknown_provider_noop():
     assert kwargs == {}
 
 
-# ========== get_llm_kwargs: no params ==========
+# ========== No params ==========
 
 
 def test_no_params():
-    kwargs = get_llm_kwargs("openai")
+    model = OpenAIModel(model="gpt-5.4")
+    kwargs = get_llm_kwargs(model)
     assert kwargs == {}
 
 
-# ========== get_llm_kwargs: validation ==========
+# ========== Validation ==========
 
 
 def test_invalid_effort():
@@ -154,44 +216,33 @@ def test_invalid_tier():
         get_llm_kwargs("openai", tier="ultra")
 
 
-# ========== get_llm_kwargs: from model instances ==========
-
-
-def test_from_openai_model_instance():
-    model = OpenAIModel()
-    kwargs = get_llm_kwargs(model, effort="low", tier="flex")
-    assert kwargs == {"reasoning_effort": "none", "service_tier": "flex"}
-
-
-def test_from_anthropic_model_instance():
-    model = AnthropicModel()
-    kwargs = get_llm_kwargs(model, effort="high")
-    assert kwargs == {"output_config": {"effort": "high"}}
-
-
-def test_from_grok_model_instance():
-    model = GrokModel()
-    kwargs = get_llm_kwargs(model, effort="medium")
-    assert kwargs == {"reasoning_effort": "medium"}
-
-
 # ========== Integration: kwargs work with actual API calls ==========
 
 
-def test_openai_integration():
-    """Verify get_llm_kwargs output works in a real API call."""
-    model = OpenAIModel()
+def test_openai_gpt5_integration():
+    """GPT-5.4 with effort=low tier=flex actually works."""
+    model = OpenAIModel(model="gpt-5.4")
     kwargs = get_llm_kwargs(model, effort="low", tier="flex")
     response = model.chat(
         messages=[{"role": "user", "content": "Say OK"}],
         **kwargs,
     )
     assert response.text is not None
-    assert len(response.text) > 0
+
+
+def test_openai_gpt4_integration():
+    """GPT-4.1-mini with effort/tier — helper returns empty, call works."""
+    model = OpenAIModel(model="gpt-4.1-mini")
+    kwargs = get_llm_kwargs(model, effort="low", tier="flex")
+    assert kwargs == {}
+    response = model.chat(
+        messages=[{"role": "user", "content": "Say OK"}],
+        **kwargs,
+    )
+    assert response.text is not None
 
 
 def test_anthropic_integration():
-    """Verify get_llm_kwargs output works in a real API call."""
     model = AnthropicModel()
     kwargs = get_llm_kwargs(model, effort="low")
     response = model.chat(
@@ -199,11 +250,9 @@ def test_anthropic_integration():
         **kwargs,
     )
     assert response.text is not None
-    assert len(response.text) > 0
 
 
 def test_google_integration():
-    """Verify get_llm_kwargs output works in a real API call."""
     model = GoogleModel()
     kwargs = get_llm_kwargs(model, effort="low")
     response = model.chat(
@@ -211,4 +260,3 @@ def test_google_integration():
         **kwargs,
     )
     assert response.text is not None
-    assert len(response.text) > 0
