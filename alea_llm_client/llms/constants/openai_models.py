@@ -30,6 +30,25 @@ def _get_fallback_models() -> dict[str, list[str]]:
             "gpt-5-mini",
             "gpt-5-nano",
             "gpt-5-chat-latest",
+            "gpt-5-2025-08-07",
+            "gpt-5-mini-2025-08-07",
+            "gpt-5-nano-2025-08-07",
+            "gpt-5-codex",
+            "gpt-5-pro",
+            "gpt-5-pro-2025-10-06",
+            "gpt-5.1",
+            "gpt-5.1-2025-11-13",
+            "gpt-5.1-chat-latest",
+            "gpt-5.1-codex",
+            "gpt-5.1-codex-max",
+            "gpt-5.1-mini",
+            "gpt-5.2",
+            "gpt-5.2-2025-12-11",
+            "gpt-5.2-chat-latest",
+            "gpt-5.2-pro",
+            "gpt-5.2-pro-2025-12-11",
+            "gpt-5.3-chat-latest",
+            "gpt-5.4",
         ],
         "o_series": [
             "o1",
@@ -96,7 +115,8 @@ REALTIME_MODELS = _get_models("realtime")
 GPT_4O_MODELS = _get_models("gpt_4o") + AUDIO_MODELS + SEARCH_MODELS
 
 # Parameter Values
-REASONING_EFFORT_VALUES = ["minimal", "low", "medium", "high"]
+REASONING_EFFORT_VALUES = ["none", "minimal", "low", "medium", "high", "xhigh"]
+SERVICE_TIER_VALUES = ["auto", "default", "flex", "scale", "priority"]
 VERBOSITY_VALUES = ["low", "medium", "high"]
 MODALITY_VALUES = ["text", "audio"]
 

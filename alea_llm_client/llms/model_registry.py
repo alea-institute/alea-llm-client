@@ -43,6 +43,30 @@ class OpenAIModels(str, Enum):
     GPT_5_NANO_2025_08_07 = "gpt-5-nano-2025-08-07"
     GPT_5_CHAT_LATEST = "gpt-5-chat-latest"
 
+    # GPT-5 Pro/Codex Models
+    GPT_5_CODEX = "gpt-5-codex"
+    GPT_5_PRO = "gpt-5-pro"
+    GPT_5_PRO_2025_10_06 = "gpt-5-pro-2025-10-06"
+
+    # GPT-5.1 Models
+    GPT_5_1 = "gpt-5.1"
+    GPT_5_1_2025_11_13 = "gpt-5.1-2025-11-13"
+    GPT_5_1_CHAT_LATEST = "gpt-5.1-chat-latest"
+    GPT_5_1_CODEX = "gpt-5.1-codex"
+    GPT_5_1_CODEX_MAX = "gpt-5.1-codex-max"
+    GPT_5_1_MINI = "gpt-5.1-mini"
+
+    # GPT-5.2 Models
+    GPT_5_2 = "gpt-5.2"
+    GPT_5_2_2025_12_11 = "gpt-5.2-2025-12-11"
+    GPT_5_2_CHAT_LATEST = "gpt-5.2-chat-latest"
+    GPT_5_2_PRO = "gpt-5.2-pro"
+    GPT_5_2_PRO_2025_12_11 = "gpt-5.2-pro-2025-12-11"
+
+    # GPT-5.3/5.4 Models
+    GPT_5_3_CHAT_LATEST = "gpt-5.3-chat-latest"
+    GPT_5_4 = "gpt-5.4"
+
     # GPT-4.1 Models
     GPT_4_1 = "gpt-4.1"
     GPT_4_1_MINI = "gpt-4.1-mini"
@@ -103,6 +127,9 @@ class OpenAIModels(str, Enum):
     # Computer Use Models
     COMPUTER_USE_PREVIEW = "computer-use-preview"
     COMPUTER_USE_PREVIEW_2025_03_11 = "computer-use-preview-2025-03-11"
+
+    # Codex Models
+    CODEX_MINI_LATEST = "codex-mini-latest"
 
     # Legacy GPT-4 Models
     GPT_4_TURBO = "gpt-4-turbo"

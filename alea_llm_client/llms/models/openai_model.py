@@ -154,9 +154,14 @@ class OpenAIModel(OpenAICompatibleModel, LoggerMixin):
         usage = response_data.get("usage", {})
         reasoning_tokens = usage.get("reasoning_tokens")
 
+        # Build metadata with service_tier if present
+        metadata: dict[str, Any] = {"model": self.model, "usage": usage}
+        if response_data.get("service_tier"):
+            metadata["service_tier"] = response_data["service_tier"]
+
         model_response = ModelResponse(
             choices=choices,
-            metadata={"model": self.model, "usage": usage},
+            metadata=metadata,
             text=choices[0] if len(choices) > 0 else "",
             reasoning_tokens=reasoning_tokens,
         )

@@ -209,11 +209,22 @@ class OpenAICompatibleModel(BaseAIModel):
         # Handle reasoning_effort parameter (o-series models)
         if "reasoning_effort" in kwargs:
             effort = kwargs.pop("reasoning_effort")
-            if effort in ["minimal", "low", "medium", "high"]:
+            if effort in ["none", "minimal", "low", "medium", "high", "xhigh"]:
                 request_body["reasoning_effort"] = effort
                 self.logger.debug(f"Using reasoning_effort: {effort}")
             else:
-                raise ValueError(f"Invalid reasoning_effort '{effort}'. Must be one of: minimal, low, medium, high")
+                raise ValueError(
+                    f"Invalid reasoning_effort '{effort}'. Must be one of: none, minimal, low, medium, high, xhigh"
+                )
+
+        # Handle service_tier parameter
+        if "service_tier" in kwargs:
+            tier = kwargs.pop("service_tier")
+            if tier in ["auto", "default", "flex", "scale", "priority"]:
+                request_body["service_tier"] = tier
+                self.logger.debug(f"Using service_tier: {tier}")
+            else:
+                raise ValueError(f"Invalid service_tier '{tier}'. Must be one of: auto, default, flex, scale, priority")
 
         # Handle verbosity parameter
         if "verbosity" in kwargs:
@@ -310,11 +321,22 @@ class OpenAICompatibleModel(BaseAIModel):
         # Handle reasoning_effort parameter (o-series models)
         if "reasoning_effort" in kwargs:
             effort = kwargs.pop("reasoning_effort")
-            if effort in ["minimal", "low", "medium", "high"]:
+            if effort in ["none", "minimal", "low", "medium", "high", "xhigh"]:
                 request_body["reasoning_effort"] = effort
                 self.logger.debug(f"Using reasoning_effort: {effort}")
             else:
-                raise ValueError(f"Invalid reasoning_effort '{effort}'. Must be one of: minimal, low, medium, high")
+                raise ValueError(
+                    f"Invalid reasoning_effort '{effort}'. Must be one of: none, minimal, low, medium, high, xhigh"
+                )
+
+        # Handle service_tier parameter
+        if "service_tier" in kwargs:
+            tier = kwargs.pop("service_tier")
+            if tier in ["auto", "default", "flex", "scale", "priority"]:
+                request_body["service_tier"] = tier
+                self.logger.debug(f"Using service_tier: {tier}")
+            else:
+                raise ValueError(f"Invalid service_tier '{tier}'. Must be one of: auto, default, flex, scale, priority")
 
         # Handle verbosity parameter
         if "verbosity" in kwargs:
@@ -766,10 +788,35 @@ class OpenAICompatibleModel(BaseAIModel):
                 ):
                     choices.append(output_item["input"])
 
+                # Handle tool call output types (web_search_call, file_search_call,
+                # code_interpreter_call, computer_call, mcp_call, etc.)
+                elif (
+                    output_type
+                    in (
+                        "web_search_call",
+                        "file_search_call",
+                        "code_interpreter_call",
+                        "computer_call",
+                        "mcp_call",
+                        "mcp_list_tools",
+                        "mcp_approval_request",
+                        "image_generation_call",
+                        "local_shell_call",
+                    )
+                    or output_type == "function_call"
+                    or (output_type is not None and output_type not in ("reasoning",))
+                ):
+                    choices.append(output_item)
+
+        # Build metadata with service_tier if present
+        metadata: dict[str, Any] = {"model": self.model, "usage": response_data.get("usage", {})}
+        if response_data.get("service_tier"):
+            metadata["service_tier"] = response_data["service_tier"]
+
         model_response = ModelResponse(
             choices=choices,
-            metadata={"model": self.model, "usage": response_data.get("usage", {})},
-            text=choices[0] if len(choices) > 0 else "",
+            metadata=metadata,
+            text=choices[0] if len(choices) > 0 and isinstance(choices[0], str) else "",
         )
         self.logger.debug(f"Model response: {model_response}")
         return model_response
@@ -826,10 +873,24 @@ class OpenAICompatibleModel(BaseAIModel):
             elif isinstance(reasoning, str):
                 request_body["reasoning"] = {"effort": reasoning}
 
-        # Handle other standard parameters
+        # Handle reasoning_effort parameter
         if "reasoning_effort" in kwargs:
             effort = kwargs.pop("reasoning_effort")
-            request_body["reasoning"] = {"effort": effort}
+            if effort in ["none", "minimal", "low", "medium", "high", "xhigh"]:
+                request_body["reasoning"] = {"effort": effort}
+            else:
+                raise ValueError(
+                    f"Invalid reasoning_effort '{effort}'. Must be one of: none, minimal, low, medium, high, xhigh"
+                )
+
+        # Handle service_tier parameter
+        if "service_tier" in kwargs:
+            tier = kwargs.pop("service_tier")
+            if tier in ["auto", "default", "flex", "scale", "priority"]:
+                request_body["service_tier"] = tier
+                self.logger.debug(f"Using service_tier: {tier}")
+            else:
+                raise ValueError(f"Invalid service_tier '{tier}'. Must be one of: auto, default, flex, scale, priority")
 
         if "verbosity" in kwargs:
             verbosity = kwargs.pop("verbosity")
@@ -940,10 +1001,24 @@ class OpenAICompatibleModel(BaseAIModel):
             elif isinstance(reasoning, str):
                 request_body["reasoning"] = {"effort": reasoning}
 
-        # Handle other standard parameters
+        # Handle reasoning_effort parameter
         if "reasoning_effort" in kwargs:
             effort = kwargs.pop("reasoning_effort")
-            request_body["reasoning"] = {"effort": effort}
+            if effort in ["none", "minimal", "low", "medium", "high", "xhigh"]:
+                request_body["reasoning"] = {"effort": effort}
+            else:
+                raise ValueError(
+                    f"Invalid reasoning_effort '{effort}'. Must be one of: none, minimal, low, medium, high, xhigh"
+                )
+
+        # Handle service_tier parameter
+        if "service_tier" in kwargs:
+            tier = kwargs.pop("service_tier")
+            if tier in ["auto", "default", "flex", "scale", "priority"]:
+                request_body["service_tier"] = tier
+                self.logger.debug(f"Using service_tier: {tier}")
+            else:
+                raise ValueError(f"Invalid service_tier '{tier}'. Must be one of: auto, default, flex, scale, priority")
 
         if "verbosity" in kwargs:
             verbosity = kwargs.pop("verbosity")

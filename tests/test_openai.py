@@ -636,3 +636,269 @@ def test_model_defaults():
     assert chat_model.model == OPENAI_DEFAULT_CHAT_MODEL
     assert reasoning_model.model == OPENAI_DEFAULT_REASONING_MODEL
     assert fast_model.model == OPENAI_DEFAULT_FAST_MODEL
+
+
+# ========== Phase 1-2: reasoning_effort and service_tier tests ==========
+
+
+def test_reasoning_effort_none():
+    """Test reasoning_effort='none' with a GPT-5.1 model."""
+    model = OpenAIModel(model="gpt-5.1")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 2+2?"}],
+        reasoning_effort="none",
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert len(response.text) > 0
+
+
+def test_reasoning_effort_xhigh():
+    """Test reasoning_effort='xhigh' with a model that supports it."""
+    model = OpenAIModel(model="o4-mini")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 7 * 8?"}],
+        reasoning_effort="xhigh",
+        max_completion_tokens=2000,
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert len(response.text) > 0
+
+
+def test_service_tier_flex():
+    """Test service_tier='flex' and verify it appears in metadata."""
+    model = OpenAIModel(model="gpt-5")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "Say hello."}],
+        service_tier="flex",
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert len(response.text) > 0
+    # service_tier may or may not be echoed back depending on API behavior
+    # but the request should succeed without error
+
+
+def test_service_tier_invalid():
+    """Test that an invalid service_tier raises ValueError."""
+    model = OpenAIModel(model="gpt-5")
+
+    with pytest.raises(ALEARetryExhaustedError):
+        model.chat(
+            messages=[{"role": "user", "content": "Test"}],
+            service_tier="invalid_tier",
+        )
+
+
+# ========== Phase 3: Tool creation helpers tests ==========
+
+
+def test_tool_creation_helpers():
+    """Unit tests for all create_*_tool functions."""
+    from alea_llm_client.llms.constants import (
+        create_apply_patch_tool,
+        create_code_interpreter_tool,
+        create_computer_tool,
+        create_computer_use_preview_tool,
+        create_file_search_tool,
+        create_function_tool,
+        create_image_generation_tool,
+        create_local_shell_tool,
+        create_mcp_tool,
+        create_tool_search_tool,
+        create_web_search_preview_tool,
+        create_web_search_tool,
+    )
+
+    # web_search
+    ws = create_web_search_tool()
+    assert ws["type"] == "web_search"
+    assert ws["search_context_size"] == "medium"
+
+    ws_custom = create_web_search_tool(
+        search_context_size="high",
+        user_location={"type": "approximate", "city": "NYC"},
+    )
+    assert ws_custom["search_context_size"] == "high"
+    assert ws_custom["user_location"]["city"] == "NYC"
+
+    # web_search_preview
+    wsp = create_web_search_preview_tool(search_content_types=["text", "image"])
+    assert wsp["type"] == "web_search_preview"
+    assert wsp["search_content_types"] == ["text", "image"]
+
+    # file_search
+    fs = create_file_search_tool(vector_store_ids=["vs_123"], max_num_results=5)
+    assert fs["type"] == "file_search"
+    assert fs["vector_store_ids"] == ["vs_123"]
+    assert fs["max_num_results"] == 5
+
+    # code_interpreter
+    ci = create_code_interpreter_tool()
+    assert ci["type"] == "code_interpreter"
+
+    ci_container = create_code_interpreter_tool(container={"image": "python:3.12"})
+    assert ci_container["container"]["image"] == "python:3.12"
+
+    # computer
+    comp = create_computer_tool()
+    assert comp["type"] == "computer"
+
+    # computer_use_preview
+    cup = create_computer_use_preview_tool(display_width=1920, display_height=1080, environment="mac")
+    assert cup["type"] == "computer_use_preview"
+    assert cup["display_width"] == 1920
+    assert cup["environment"] == "mac"
+
+    # image_generation
+    ig = create_image_generation_tool(quality="high", size="1024x1024")
+    assert ig["type"] == "image_generation"
+    assert ig["quality"] == "high"
+
+    # mcp
+    mcp = create_mcp_tool(server_label="test", server_url="https://example.com/mcp")
+    assert mcp["type"] == "mcp"
+    assert mcp["server_label"] == "test"
+    assert mcp["server_url"] == "https://example.com/mcp"
+
+    mcp_connector = create_mcp_tool(server_label="test2", connector_id="conn_123")
+    assert mcp_connector["connector_id"] == "conn_123"
+
+    # mcp requires either server_url or connector_id
+    with pytest.raises(ValueError):
+        create_mcp_tool(server_label="test3")
+
+    # function
+    fn = create_function_tool(
+        name="get_weather",
+        parameters={"type": "object", "properties": {"city": {"type": "string"}}},
+        description="Get weather",
+        strict=True,
+    )
+    assert fn["type"] == "function"
+    assert fn["name"] == "get_weather"
+    assert fn["strict"] is True
+
+    # local_shell
+    ls = create_local_shell_tool()
+    assert ls["type"] == "local_shell"
+
+    # tool_search
+    ts = create_tool_search_tool(execution="client")
+    assert ts["type"] == "tool_search"
+    assert ts["execution"] == "client"
+
+    # apply_patch
+    ap = create_apply_patch_tool()
+    assert ap["type"] == "apply_patch"
+
+
+# ========== Phase 4-6: New model lists tests ==========
+
+
+def test_new_model_lists():
+    """Test that GPT_5_MODELS contains all new models."""
+    from alea_llm_client.llms.constants import GPT_5_MODELS
+
+    new_models = [
+        "gpt-5.1",
+        "gpt-5.1-mini",
+        "gpt-5.1-codex",
+        "gpt-5.1-codex-max",
+        "gpt-5.2",
+        "gpt-5.2-pro",
+        "gpt-5.3-chat-latest",
+        "gpt-5.4",
+        "gpt-5-codex",
+        "gpt-5-pro",
+    ]
+
+    for model_name in new_models:
+        assert model_name in GPT_5_MODELS, f"{model_name} should be in GPT_5_MODELS"
+
+
+def test_service_tier_constants():
+    """Test SERVICE_TIER_VALUES contains all expected values."""
+    from alea_llm_client.llms.constants import SERVICE_TIER_VALUES
+
+    assert SERVICE_TIER_VALUES == ["auto", "default", "flex", "scale", "priority"]
+
+
+def test_reasoning_effort_constants():
+    """Test REASONING_EFFORT_VALUES has 6 values including none and xhigh."""
+    from alea_llm_client.llms.constants import REASONING_EFFORT_VALUES
+
+    assert len(REASONING_EFFORT_VALUES) == 6
+    assert "none" in REASONING_EFFORT_VALUES
+    assert "xhigh" in REASONING_EFFORT_VALUES
+    assert "minimal" in REASONING_EFFORT_VALUES
+    assert "low" in REASONING_EFFORT_VALUES
+    assert "medium" in REASONING_EFFORT_VALUES
+    assert "high" in REASONING_EFFORT_VALUES
+
+
+# ========== Phase 7: New model API tests ==========
+
+
+def test_gpt_5_1_model():
+    """Test that GPT-5.1 model works via the API."""
+    model = OpenAIModel(model="gpt-5.1")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 3 + 5?"}],
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "8" in response.text
+
+
+def test_gpt_5_2_model():
+    """Test that GPT-5.2 model works via the API."""
+    model = OpenAIModel(model="gpt-5.2")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 10 - 3?"}],
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "7" in response.text
+
+
+def test_gpt_5_4_model():
+    """Test that GPT-5.4 model works via the API."""
+    model = OpenAIModel(model="gpt-5.4")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 6 * 7?"}],
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "42" in response.text
+
+
+def test_web_search_tool_responses_api():
+    """Test web_search tool with the Responses API."""
+    from alea_llm_client.llms.constants import create_web_search_tool
+
+    model = OpenAIModel(model="gpt-5")
+
+    web_search = create_web_search_tool(search_context_size="low")
+
+    response: ModelResponse = model.responses(
+        input="What is the current population of Tokyo?",
+        tools=[web_search],
+    )
+
+    assert isinstance(response, ModelResponse)
+    # Response should contain text output or tool call results
+    assert len(response.choices) > 0

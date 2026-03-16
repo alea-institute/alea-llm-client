@@ -133,8 +133,9 @@ ignore = [
     "PLR2004", "ARG001", "ARG002",  # existing test ignores
     "E501",    # long lines in test content strings
     "TRY002",  # generic exceptions in test mocks
-    "SIM117",  # nested with statements for test clarity  
+    "SIM117",  # nested with statements for test clarity
     "B017",    # assert exceptions in pytest patterns
+    "PLC0415", # imports inside test functions for focused imports
 ]
 "alea_llm_client/llms/constants/grammar_constants.py" = [
     "PLC0415",  # import re inside function for regex validation is fine
