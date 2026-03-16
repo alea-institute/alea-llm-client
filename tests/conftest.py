@@ -194,14 +194,14 @@ def google_model():
     if gemini_key:
         # Use Google AI Studio (Gemini API)
         model = GoogleModel(
-            model="gemini-3-flash-preview",
+            model="gemini-3.1-pro-preview",
             endpoint="https://generativelanguage.googleapis.com",
             api_key=gemini_key,
         )
     elif vertex_key and vertex_project:
         # Use Vertex AI
         model = GoogleModel(
-            model="gemini-3-flash-preview",
+            model="gemini-3.1-pro-preview",
             endpoint=f"https://{vertex_location}-aiplatform.googleapis.com",
             api_key=vertex_key,
             project_id=vertex_project,
@@ -210,7 +210,7 @@ def google_model():
     else:
         # Default to Google AI Studio endpoint (tests might skip if no API key)
         model = GoogleModel(
-            model="gemini-3-flash-preview",
+            model="gemini-3.1-pro-preview",
             endpoint="https://generativelanguage.googleapis.com",
         )
 
@@ -219,7 +219,7 @@ def google_model():
 
 @pytest.fixture
 def grok_model():
-    model = GrokModel(model="grok-4")
+    model = GrokModel(model="grok-4-fast-non-reasoning")
     return RateLimitedModel(model, "xai")
 
 

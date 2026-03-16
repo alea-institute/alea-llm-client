@@ -216,10 +216,11 @@ class GoogleModels(str, Enum):
 
     # Gemini 3 Models (Preview)
     GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview"
+    GEMINI_3_1_FLASH_IMAGE_PREVIEW = "gemini-3.1-flash-image-preview"
+    GEMINI_3_1_FLASH_LITE_PREVIEW = "gemini-3.1-flash-lite-preview"
     GEMINI_3_PRO_PREVIEW = "gemini-3-pro-preview"
     GEMINI_3_PRO_IMAGE_PREVIEW = "gemini-3-pro-image-preview"
     GEMINI_3_FLASH_PREVIEW = "gemini-3-flash-preview"
-    GEMINI_3_1_FLASH_IMAGE_PREVIEW = "gemini-3.1-flash-image-preview"
 
     # Gemini 2.5 Additional Models
     GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite"
@@ -261,6 +262,23 @@ class GrokModels(str, Enum):
     # Grok 4 Models (Latest flagship)
     GROK_4 = "grok-4"
     GROK_4_HEAVY = "grok-4-heavy"
+
+    # Grok 4.20 Models (Beta)
+    GROK_4_20_MULTI_AGENT_BETA_0309 = "grok-4.20-multi-agent-beta-0309"
+    GROK_4_20_BETA_0309_REASONING = "grok-4.20-beta-0309-reasoning"
+    GROK_4_20_BETA_0309_NON_REASONING = "grok-4.20-beta-0309-non-reasoning"
+
+    # Grok 4.1 Fast Models
+    GROK_4_1_FAST_REASONING = "grok-4-1-fast-reasoning"
+    GROK_4_1_FAST_NON_REASONING = "grok-4-1-fast-non-reasoning"
+
+    # Grok 4 Fast Models
+    GROK_4_FAST_REASONING = "grok-4-fast-reasoning"
+    GROK_4_FAST_NON_REASONING = "grok-4-fast-non-reasoning"
+    GROK_4_0709 = "grok-4-0709"
+
+    # Grok Code Models
+    GROK_CODE_FAST_1 = "grok-code-fast-1"
 
     # Grok 3 Models
     GROK_3 = "grok-3"

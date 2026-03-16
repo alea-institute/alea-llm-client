@@ -43,7 +43,7 @@ class GoogleModel(BaseAIModel):
 
     def __init__(
         self,
-        model: str = "gemini-3-flash-preview",
+        model: str = "gemini-3.1-pro-preview",
         endpoint: str = "https://generativelanguage.googleapis.com",
         api_key: Optional[str] = None,
         formatter: Optional[Callable[[str], str]] = None,
