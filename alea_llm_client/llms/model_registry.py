@@ -166,7 +166,19 @@ class AnthropicModels(str, Enum):
     Source: references/anthropic-sdk-python/src/anthropic/types/model.py
     """
 
-    # Claude 4 Models (Latest generation with thinking capabilities)
+    # Claude 4.6 Models (Latest generation)
+    CLAUDE_OPUS_4_6 = "claude-opus-4-6"
+    CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
+
+    # Claude 4.5 Models
+    CLAUDE_OPUS_4_5 = "claude-opus-4-5"
+    CLAUDE_OPUS_4_5_20251101 = "claude-opus-4-5-20251101"
+    CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
+    CLAUDE_SONNET_4_5_20250929 = "claude-sonnet-4-5-20250929"
+    CLAUDE_HAIKU_4_5 = "claude-haiku-4-5"
+    CLAUDE_HAIKU_4_5_20251001 = "claude-haiku-4-5-20251001"
+
+    # Claude 4 Models (with thinking capabilities)
     CLAUDE_SONNET_4_20250514 = "claude-sonnet-4-20250514"
     CLAUDE_SONNET_4_0 = "claude-sonnet-4-0"
     CLAUDE_4_SONNET_20250514 = "claude-4-sonnet-20250514"

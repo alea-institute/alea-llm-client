@@ -43,7 +43,7 @@ class AnthropicModel(BaseAIModel, LoggerMixin):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = "claude-sonnet-4-6",
         endpoint: str = DEFAULT_ENDPOINT,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
@@ -181,6 +181,36 @@ class AnthropicModel(BaseAIModel, LoggerMixin):
             else:
                 raise ValueError("thinking parameter must be a boolean or dictionary")
 
+        # Handle service_tier parameter
+        if "service_tier" in kwargs:
+            tier = kwargs.pop("service_tier")
+            if tier in ["auto", "standard_only"]:
+                request_body["service_tier"] = tier
+                self.logger.debug(f"Using service_tier: {tier}")
+            else:
+                raise ValueError(f"Invalid service_tier '{tier}'. Must be one of: auto, standard_only")
+
+        # Handle output_config parameter
+        if "output_config" in kwargs:
+            output_config = kwargs.pop("output_config")
+            if isinstance(output_config, dict):
+                # Validate effort if present
+                effort = output_config.get("effort")
+                if effort is not None and effort not in ["low", "medium", "high", "max"]:
+                    raise ValueError(f"Invalid output_config effort '{effort}'. Must be one of: low, medium, high, max")
+                request_body["output_config"] = output_config
+                self.logger.debug(f"Using output_config: {output_config}")
+            else:
+                raise ValueError("output_config must be a dictionary")
+
+        # Handle metadata parameter
+        if "metadata" in kwargs:
+            metadata = kwargs.pop("metadata")
+            if isinstance(metadata, dict):
+                request_body["metadata"] = metadata
+            else:
+                raise ValueError("metadata must be a dictionary")
+
         try:
             # set any missing DEFAULT_KWARGS
             for k, v in DEFAULT_KWARGS.items():
@@ -277,6 +307,36 @@ class AnthropicModel(BaseAIModel, LoggerMixin):
                 # Don't include thinking config if disabled
             else:
                 raise ValueError("thinking parameter must be a boolean or dictionary")
+
+        # Handle service_tier parameter
+        if "service_tier" in kwargs:
+            tier = kwargs.pop("service_tier")
+            if tier in ["auto", "standard_only"]:
+                request_body["service_tier"] = tier
+                self.logger.debug(f"Using service_tier: {tier}")
+            else:
+                raise ValueError(f"Invalid service_tier '{tier}'. Must be one of: auto, standard_only")
+
+        # Handle output_config parameter
+        if "output_config" in kwargs:
+            output_config = kwargs.pop("output_config")
+            if isinstance(output_config, dict):
+                # Validate effort if present
+                effort = output_config.get("effort")
+                if effort is not None and effort not in ["low", "medium", "high", "max"]:
+                    raise ValueError(f"Invalid output_config effort '{effort}'. Must be one of: low, medium, high, max")
+                request_body["output_config"] = output_config
+                self.logger.debug(f"Using output_config: {output_config}")
+            else:
+                raise ValueError("output_config must be a dictionary")
+
+        # Handle metadata parameter
+        if "metadata" in kwargs:
+            metadata = kwargs.pop("metadata")
+            if isinstance(metadata, dict):
+                request_body["metadata"] = metadata
+            else:
+                raise ValueError("metadata must be a dictionary")
 
         try:
             # set any missing DEFAULT_KWARGS
@@ -441,9 +501,14 @@ class AnthropicModel(BaseAIModel, LoggerMixin):
         usage = response_data.get("usage", {})
         reasoning_tokens = usage.get("reasoning_tokens")
 
+        # Build metadata with service_tier if present
+        metadata: dict[str, Any] = {"model": self.model, "usage": usage}
+        if response_data.get("service_tier"):
+            metadata["service_tier"] = response_data["service_tier"]
+
         model_response = ModelResponse(
             choices=choices,
-            metadata={"model": self.model, "usage": usage},
+            metadata=metadata,
             text=choices[0] if len(choices) > 0 else "",
             thinking=thinking_content,
             reasoning_tokens=reasoning_tokens,

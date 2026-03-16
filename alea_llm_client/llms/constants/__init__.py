@@ -2,6 +2,7 @@
 
 from .anthropic_models import (
     ALL_CLAUDE_MODELS,
+    ANTHROPIC_SERVICE_TIER_VALUES,
     CLAUDE_3_5_MODELS,
     CLAUDE_3_7_MODELS,
     CLAUDE_3_MODELS,
@@ -13,6 +14,7 @@ from .anthropic_models import (
     DEFAULT_THINKING_MODEL,
     HAIKU_MODELS,
     OPUS_MODELS,
+    OUTPUT_EFFORT_VALUES,
     SONNET_MODELS,
     THINKING_DISABLED_CONFIG,
     THINKING_ENABLED_MODELS,
@@ -35,6 +37,18 @@ from .anthropic_models import (
 )
 from .anthropic_models import (
     DEFAULT_THINKING_MODEL as ANTHROPIC_DEFAULT_THINKING_MODEL,
+)
+from .anthropic_tool_constants import (
+    create_anthropic_bash_tool,
+    create_anthropic_code_execution_tool,
+    create_anthropic_computer_use_tool,
+    create_anthropic_function_tool,
+    create_anthropic_memory_tool,
+    create_anthropic_text_editor_tool,
+    create_anthropic_tool_search_bm25_tool,
+    create_anthropic_tool_search_regex_tool,
+    create_anthropic_web_fetch_tool,
+    create_anthropic_web_search_tool,
 )
 from .grammar_constants import (
     EXAMPLE_GRAMMARS,
@@ -103,6 +117,7 @@ __all__ = [
     "ANTHROPIC_DEFAULT_FAST_MODEL",
     "ANTHROPIC_DEFAULT_REASONING_MODEL",
     "ANTHROPIC_DEFAULT_THINKING_MODEL",
+    "ANTHROPIC_SERVICE_TIER_VALUES",
     "AUDIO_MODELS",
     "BALANCED",
     "CLAUDE_3_5_MODELS",
@@ -132,6 +147,7 @@ __all__ = [
     "OPENAI_DEFAULT_FAST_MODEL",
     "OPENAI_DEFAULT_REASONING_MODEL",
     "OPUS_MODELS",
+    "OUTPUT_EFFORT_VALUES",
     "O_SERIES_MODELS",
     "REALTIME_MODELS",
     "REASONING_EFFORT_VALUES",
@@ -145,6 +161,16 @@ __all__ = [
     "VERBOSITY_VALUES",
     "GrammarSyntax",
     "GrammarSyntaxType",
+    "create_anthropic_bash_tool",
+    "create_anthropic_code_execution_tool",
+    "create_anthropic_computer_use_tool",
+    "create_anthropic_function_tool",
+    "create_anthropic_memory_tool",
+    "create_anthropic_text_editor_tool",
+    "create_anthropic_tool_search_bm25_tool",
+    "create_anthropic_tool_search_regex_tool",
+    "create_anthropic_web_fetch_tool",
+    "create_anthropic_web_search_tool",
     "create_apply_patch_tool",
     "create_code_interpreter_tool",
     "create_computer_tool",

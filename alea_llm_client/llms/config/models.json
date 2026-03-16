@@ -1577,6 +1577,136 @@
       "name": "Anthropic",
       "endpoint": "https://api.anthropic.com",
       "models": {
+        "claude-opus-4-6": {
+          "family": "claude-4",
+          "tier": "large",
+          "status": "ga",
+          "context_window": 200000,
+          "max_output_tokens": 32000,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "premium"
+        },
+        "claude-sonnet-4-6": {
+          "family": "claude-4",
+          "tier": "medium",
+          "status": "ga",
+          "context_window": 1000000,
+          "max_output_tokens": 64000,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "medium"
+        },
+        "claude-opus-4-5": {
+          "family": "claude-4",
+          "tier": "large",
+          "status": "ga",
+          "release_date": "2025-11-01",
+          "context_window": 200000,
+          "max_output_tokens": 32000,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "premium"
+        },
+        "claude-opus-4-5-20251101": {
+          "family": "claude-4",
+          "tier": "large",
+          "status": "ga",
+          "release_date": "2025-11-01",
+          "context_window": 200000,
+          "max_output_tokens": 32000,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "premium"
+        },
+        "claude-sonnet-4-5": {
+          "family": "claude-4",
+          "tier": "medium",
+          "status": "ga",
+          "release_date": "2025-09-29",
+          "context_window": 1000000,
+          "max_output_tokens": 64000,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "medium"
+        },
+        "claude-sonnet-4-5-20250929": {
+          "family": "claude-4",
+          "tier": "medium",
+          "status": "ga",
+          "release_date": "2025-09-29",
+          "context_window": 1000000,
+          "max_output_tokens": 64000,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "medium"
+        },
+        "claude-haiku-4-5": {
+          "family": "claude-4",
+          "tier": "small",
+          "status": "ga",
+          "release_date": "2025-10-01",
+          "context_window": 200000,
+          "max_output_tokens": 8192,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "output_formats": [
+            "text"
+          ],
+          "pricing_tier": "low"
+        },
+        "claude-haiku-4-5-20251001": {
+          "family": "claude-4",
+          "tier": "small",
+          "status": "ga",
+          "release_date": "2025-10-01",
+          "context_window": 200000,
+          "max_output_tokens": 8192,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "output_formats": [
+            "text"
+          ],
+          "pricing_tier": "low"
+        },
         "claude-opus-4-1-20250805": {
           "family": "claude-4",
           "tier": "large",

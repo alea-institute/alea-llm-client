@@ -26,9 +26,20 @@ def _get_fallback_anthropic_models() -> dict[str, list[str]]:
     """Fallback static Anthropic model definitions."""
     return {
         "claude_4": [
+            "claude-opus-4-6",
+            "claude-sonnet-4-6",
+            "claude-opus-4-5",
+            "claude-opus-4-5-20251101",
+            "claude-sonnet-4-5",
+            "claude-sonnet-4-5-20250929",
+            "claude-haiku-4-5",
+            "claude-haiku-4-5-20251001",
             "claude-sonnet-4-20250514",
+            "claude-sonnet-4-0",
             "claude-opus-4-20250514",
+            "claude-opus-4-0",
             "claude-4-sonnet-20250514",
+            "claude-4-opus-20250514",
             "claude-opus-4-1-20250805",
         ],
         "claude_3_7": ["claude-3-7-sonnet-20250219", "claude-3-7-sonnet-latest"],
@@ -45,7 +56,11 @@ def _get_fallback_anthropic_models() -> dict[str, list[str]]:
             "claude-3-opus-latest",
         ],
         "sonnet": [
+            "claude-sonnet-4-6",
+            "claude-sonnet-4-5",
+            "claude-sonnet-4-5-20250929",
             "claude-sonnet-4-20250514",
+            "claude-sonnet-4-0",
             "claude-4-sonnet-20250514",
             "claude-3-7-sonnet-20250219",
             "claude-3-7-sonnet-latest",
@@ -54,12 +69,19 @@ def _get_fallback_anthropic_models() -> dict[str, list[str]]:
             "claude-3-5-sonnet-latest",
         ],
         "opus": [
+            "claude-opus-4-6",
+            "claude-opus-4-5",
+            "claude-opus-4-5-20251101",
             "claude-opus-4-20250514",
+            "claude-opus-4-0",
             "claude-opus-4-1-20250805",
+            "claude-4-opus-20250514",
             "claude-3-opus-20240229",
             "claude-3-opus-latest",
         ],
         "haiku": [
+            "claude-haiku-4-5",
+            "claude-haiku-4-5-20251001",
             "claude-3-5-haiku-20241022",
             "claude-3-5-haiku-latest",
             "claude-3-haiku-20240307",
@@ -108,6 +130,12 @@ def _get_thinking_models() -> list[str]:
 
 
 THINKING_ENABLED_MODELS = _get_thinking_models()
+
+# Service tier values for Anthropic API
+ANTHROPIC_SERVICE_TIER_VALUES = ["auto", "standard_only"]
+
+# Output effort values for Anthropic API
+OUTPUT_EFFORT_VALUES = ["low", "medium", "high", "max"]
 
 # Thinking Configuration
 DEFAULT_THINKING_CONFIG = {
@@ -217,10 +245,10 @@ def _get_dynamic_anthropic_defaults() -> dict[str, str]:
 
     # Fallback to static defaults
     return {
-        "chat": "claude-sonnet-4-20250514",
-        "reasoning": "claude-opus-4-20250514",
-        "fast": "claude-3-5-haiku-latest",
-        "thinking": "claude-sonnet-4-20250514",
+        "chat": "claude-sonnet-4-6",
+        "reasoning": "claude-opus-4-6",
+        "fast": "claude-haiku-4-5",
+        "thinking": "claude-sonnet-4-6",
     }
 
 

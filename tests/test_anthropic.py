@@ -785,9 +785,232 @@ def test_thinking_enabled_models():
         THINKING_ENABLED_MODELS,
     )
 
-    # Claude 4 and 3.7 models should support thinking
+    # Claude 4 models that support thinking (excludes haiku which doesn't)
     for model in CLAUDE_4_MODELS:
-        assert model in THINKING_ENABLED_MODELS, f"Claude 4 model {model} should support thinking"
+        if "haiku" not in model:
+            assert model in THINKING_ENABLED_MODELS, f"Claude 4 model {model} should support thinking"
 
     for model in CLAUDE_3_7_MODELS:
         assert model in THINKING_ENABLED_MODELS, f"Claude 3.7 model {model} should support thinking"
+
+
+# ========== New model tests ==========
+
+
+def test_claude_4_6_models():
+    """Test that Claude 4.6 models are in the model lists."""
+    from alea_llm_client.llms.constants import CLAUDE_4_MODELS, OPUS_MODELS, SONNET_MODELS
+
+    assert "claude-opus-4-6" in CLAUDE_4_MODELS
+    assert "claude-sonnet-4-6" in CLAUDE_4_MODELS
+    assert "claude-opus-4-6" in OPUS_MODELS
+    assert "claude-sonnet-4-6" in SONNET_MODELS
+
+
+def test_claude_4_5_models():
+    """Test that Claude 4.5 models are in the model lists."""
+    from alea_llm_client.llms.constants import CLAUDE_4_MODELS, HAIKU_MODELS, OPUS_MODELS, SONNET_MODELS
+
+    assert "claude-opus-4-5" in CLAUDE_4_MODELS
+    assert "claude-opus-4-5-20251101" in CLAUDE_4_MODELS
+    assert "claude-sonnet-4-5" in CLAUDE_4_MODELS
+    assert "claude-sonnet-4-5-20250929" in CLAUDE_4_MODELS
+    assert "claude-haiku-4-5" in CLAUDE_4_MODELS
+    assert "claude-haiku-4-5-20251001" in CLAUDE_4_MODELS
+
+    assert "claude-opus-4-5" in OPUS_MODELS
+    assert "claude-sonnet-4-5" in SONNET_MODELS
+    assert "claude-haiku-4-5" in HAIKU_MODELS
+
+
+def test_claude_4_6_basic():
+    """Test Claude 4.6 Sonnet basic functionality."""
+    model = AnthropicModel(model="claude-sonnet-4-6")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 5 + 3?"}],
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "8" in response.text
+
+
+def test_claude_4_5_sonnet():
+    """Test Claude 4.5 Sonnet model."""
+    model = AnthropicModel(model="claude-sonnet-4-5")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 9 - 4?"}],
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "5" in response.text
+
+
+def test_claude_haiku_4_5():
+    """Test Claude Haiku 4.5 model."""
+    model = AnthropicModel(model="claude-haiku-4-5")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 2 * 3?"}],
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "6" in response.text
+
+
+# ========== service_tier and output_config tests ==========
+
+
+def test_service_tier_auto():
+    """Test service_tier='auto' parameter."""
+    model = AnthropicModel(model="claude-sonnet-4-6")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "Say hello."}],
+        service_tier="auto",
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert len(response.text) > 0
+
+
+def test_service_tier_invalid():
+    """Test that invalid service_tier raises ValueError."""
+    model = AnthropicModel(model="claude-sonnet-4-6")
+
+    with pytest.raises(ALEARetryExhaustedError):
+        model.chat(
+            messages=[{"role": "user", "content": "Test"}],
+            service_tier="invalid_tier",
+        )
+
+
+def test_output_config_effort():
+    """Test output_config with effort parameter."""
+    model = AnthropicModel(model="claude-sonnet-4-6")
+
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is the capital of Japan?"}],
+        output_config={"effort": "low"},
+    )
+
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert len(response.text) > 0
+
+
+def test_output_config_invalid_effort():
+    """Test that invalid output_config effort raises ValueError."""
+    model = AnthropicModel(model="claude-sonnet-4-6")
+
+    with pytest.raises(ALEARetryExhaustedError):
+        model.chat(
+            messages=[{"role": "user", "content": "Test"}],
+            output_config={"effort": "super_duper"},
+        )
+
+
+# ========== Anthropic tool creation helpers tests ==========
+
+
+def test_anthropic_tool_creation_helpers():
+    """Unit tests for all create_anthropic_*_tool functions."""
+    from alea_llm_client.llms.constants import (
+        create_anthropic_bash_tool,
+        create_anthropic_code_execution_tool,
+        create_anthropic_computer_use_tool,
+        create_anthropic_function_tool,
+        create_anthropic_memory_tool,
+        create_anthropic_text_editor_tool,
+        create_anthropic_tool_search_bm25_tool,
+        create_anthropic_tool_search_regex_tool,
+        create_anthropic_web_fetch_tool,
+        create_anthropic_web_search_tool,
+    )
+
+    # web_search
+    ws = create_anthropic_web_search_tool()
+    assert ws["type"] == "web_search_20260209"
+    assert ws["name"] == "web_search"
+
+    ws_domains = create_anthropic_web_search_tool(allowed_domains=["example.com"])
+    assert ws_domains["allowed_domains"] == ["example.com"]
+
+    # web_fetch
+    wf = create_anthropic_web_fetch_tool(max_content_tokens=5000)
+    assert wf["type"] == "web_fetch_20260209"
+    assert wf["max_content_tokens"] == 5000
+
+    # code_execution
+    ce = create_anthropic_code_execution_tool()
+    assert ce["type"] == "code_execution_20260120"
+
+    # bash
+    bash = create_anthropic_bash_tool()
+    assert bash["type"] == "bash_20250124"
+
+    # text_editor
+    te = create_anthropic_text_editor_tool()
+    assert te["type"] == "text_editor_20250728"
+
+    # computer_use
+    cu = create_anthropic_computer_use_tool(display_width_px=1920, display_height_px=1080)
+    assert cu["type"] == "computer_20251124"
+    assert cu["display_width_px"] == 1920
+
+    cu_num = create_anthropic_computer_use_tool(display_width_px=1024, display_height_px=768, display_number=1)
+    assert cu_num["display_number"] == 1
+
+    # memory
+    mem = create_anthropic_memory_tool()
+    assert mem["type"] == "memory_20250818"
+
+    # tool_search
+    bm25 = create_anthropic_tool_search_bm25_tool()
+    assert bm25["type"] == "tool_search_bm25_20251119"
+
+    regex = create_anthropic_tool_search_regex_tool()
+    assert regex["type"] == "tool_search_regex_20251119"
+
+    # function tool
+    fn = create_anthropic_function_tool(
+        name="get_weather",
+        input_schema={"type": "object", "properties": {"city": {"type": "string"}}},
+        description="Get weather",
+    )
+    assert fn["name"] == "get_weather"
+    assert fn["description"] == "Get weather"
+
+
+# ========== Anthropic constants tests ==========
+
+
+def test_anthropic_service_tier_constants():
+    """Test ANTHROPIC_SERVICE_TIER_VALUES."""
+    from alea_llm_client.llms.constants import ANTHROPIC_SERVICE_TIER_VALUES
+
+    assert ANTHROPIC_SERVICE_TIER_VALUES == ["auto", "standard_only"]
+
+
+def test_output_effort_constants():
+    """Test OUTPUT_EFFORT_VALUES."""
+    from alea_llm_client.llms.constants import OUTPUT_EFFORT_VALUES
+
+    assert OUTPUT_EFFORT_VALUES == ["low", "medium", "high", "max"]
+
+
+def test_updated_defaults():
+    """Test that defaults have been updated to latest models."""
+    from alea_llm_client.llms.constants import (
+        ANTHROPIC_DEFAULT_CHAT_MODEL,
+        ANTHROPIC_DEFAULT_REASONING_MODEL,
+        CLAUDE_4_MODELS,
+    )
+
+    assert ANTHROPIC_DEFAULT_CHAT_MODEL in CLAUDE_4_MODELS
+    assert ANTHROPIC_DEFAULT_REASONING_MODEL in CLAUDE_4_MODELS
