@@ -106,6 +106,14 @@ class OpenAICompatibleModel(BaseAIModel):
             ignore_cache=kwargs.get("ignore_cache", False),
         )
 
+    @staticmethod
+    def _extract_error_message(response_data: dict) -> str:
+        """Extract error message from API response, handling different formats."""
+        error = response_data.get("error", response_data)
+        if isinstance(error, dict):
+            return error.get("message", str(error))
+        return str(error)
+
     def get_api_key(self) -> str:
         """
         Get the API key.
@@ -267,12 +275,12 @@ class OpenAICompatibleModel(BaseAIModel):
 
             # check for 400 to return the right ALEA error
             if response.status_code == 400:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAModelError(f"Model error: {error_message}")
 
             # check for 401 to return the right ALEA error
             if response.status_code == 401:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
 
             # check for 404
@@ -379,12 +387,12 @@ class OpenAICompatibleModel(BaseAIModel):
 
             # check for 400 to return the right ALEA error
             if response.status_code == 400:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAModelError(f"Model error: {error_message}")
 
             # check for 401 to return the right ALEA error
             if response.status_code == 401:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
 
             # check for 404
@@ -927,11 +935,11 @@ class OpenAICompatibleModel(BaseAIModel):
 
             # Handle common error status codes
             if response.status_code == 400:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAModelError(f"Model error: {error_message}")
 
             if response.status_code == 401:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
 
             if response.status_code == 404:
@@ -1055,11 +1063,11 @@ class OpenAICompatibleModel(BaseAIModel):
 
             # Handle common error status codes
             if response.status_code == 400:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAModelError(f"Model error: {error_message}")
 
             if response.status_code == 401:
-                error_message = response.json().get("error", {}).get("message", response.json())
+                error_message = self._extract_error_message(response.json())
                 raise ALEAAuthenticationError(f"Authentication error: {error_message}")
 
             if response.status_code == 404:

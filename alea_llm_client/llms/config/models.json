@@ -2361,9 +2361,9 @@
         }
       },
       "defaults": {
-        "chat": "grok-2-1212",
-        "reasoning": "grok-4-0709",
-        "fast": "grok-3-fast"
+        "chat": "grok-3",
+        "reasoning": "grok-4",
+        "fast": "grok-3-mini"
       }
     }
   }

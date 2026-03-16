@@ -261,3 +261,49 @@ def test_model_response_to_json(grok_model: GrokModel):
     assert "choices" in response_json
     assert "metadata" in response_json
     assert "text" in response_json
+
+
+# ========== New model tests ==========
+
+
+def test_grok_4():
+    """Test Grok 4 model."""
+    model = GrokModel(model="grok-4")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 8 + 9?"}],
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "17" in response.text
+
+
+def test_grok_3():
+    """Test Grok 3 model."""
+    model = GrokModel(model="grok-3")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 5 * 6?"}],
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "30" in response.text
+
+
+def test_grok_3_mini():
+    """Test Grok 3 Mini model (new default)."""
+    model = GrokModel(model="grok-3-mini")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 7 - 3?"}],
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "4" in response.text
+
+
+def test_retired_model_clear_error():
+    """Test that retired Grok models give a clear error."""
+    from alea_llm_client.core.exceptions import ALEAModelError
+
+    model = GrokModel(model="grok-2-1212")
+    with pytest.raises(ALEAModelError) as exc_info:
+        model.chat(messages=[{"role": "user", "content": "Test"}])
+    assert "not found" in str(exc_info.value).lower() or "Model error" in str(exc_info.value)
