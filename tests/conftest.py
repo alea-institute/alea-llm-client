@@ -173,13 +173,13 @@ class RateLimitedModel:
 
 @pytest.fixture
 def anthropic_model():
-    model = AnthropicModel()
+    model = AnthropicModel(model="claude-sonnet-4-6")
     return RateLimitedModel(model, "anthropic")
 
 
 @pytest.fixture
 def openai_model():
-    model = OpenAIModel()
+    model = OpenAIModel(model="gpt-5")
     return RateLimitedModel(model, "openai")
 
 
@@ -194,14 +194,14 @@ def google_model():
     if gemini_key:
         # Use Google AI Studio (Gemini API)
         model = GoogleModel(
-            model="gemini-2.0-flash-exp",
+            model="gemini-3-flash-preview",
             endpoint="https://generativelanguage.googleapis.com",
             api_key=gemini_key,
         )
     elif vertex_key and vertex_project:
         # Use Vertex AI
         model = GoogleModel(
-            model="gemini-2.0-flash-exp",
+            model="gemini-3-flash-preview",
             endpoint=f"https://{vertex_location}-aiplatform.googleapis.com",
             api_key=vertex_key,
             project_id=vertex_project,
@@ -210,7 +210,7 @@ def google_model():
     else:
         # Default to Google AI Studio endpoint (tests might skip if no API key)
         model = GoogleModel(
-            model="gemini-2.0-flash-exp",
+            model="gemini-3-flash-preview",
             endpoint="https://generativelanguage.googleapis.com",
         )
 
@@ -219,7 +219,7 @@ def google_model():
 
 @pytest.fixture
 def grok_model():
-    model = GrokModel()
+    model = GrokModel(model="grok-4")
     return RateLimitedModel(model, "xai")
 
 

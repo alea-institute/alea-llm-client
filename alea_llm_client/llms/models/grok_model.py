@@ -34,7 +34,7 @@ class GrokModel(OpenAICompatibleModel, LoggerMixin):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "grok-3-mini",
+        model: str = "grok-4",
         endpoint: str = DEFAULT_ENDPOINT,
         formatter: Optional[Callable] = None,
         cache_path: Optional[Path] = DEFAULT_CACHE_PATH,
