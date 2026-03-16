@@ -1,3 +1,54 @@
+## Version 0.3.0
+
+### New Models
+* **OpenAI**: Added GPT-5.4 (1.05M context, 128K output), GPT-5.3, GPT-5.2 (400K context), GPT-5.1, plus codex and pro variants — 16 new models total
+* **Anthropic**: Added Claude Opus 4.6 (1M context, 128K output), Claude Sonnet 4.6 (1M context, 64K output), Claude 4.5 series (Opus, Sonnet, Haiku), and Haiku 4.5 — 8 new models
+* **Google**: Added Gemini 3.1 Pro Preview, Gemini 3.1 Flash Lite Preview, Gemini 3 Flash Preview, Gemini 3 Pro Preview, Gemini 2.5 Flash Lite — 5 new models
+* **xAI**: Added Grok 4.20 beta series (multi-agent, reasoning, non-reasoning), Grok 4.1 Fast, Grok 4 Fast (reasoning/non-reasoning), Grok Code Fast 1, Grok 4-0709 — 9 new models
+
+### New API Parameters
+* **OpenAI `service_tier`**: Validate and pass `auto`, `default`, `flex`, `scale`, `priority`
+* **OpenAI `reasoning_effort`**: Expanded from 4 to 6 values — added `"none"` and `"xhigh"`
+* **Anthropic `service_tier`**: Validate and pass `auto`, `standard_only`
+* **Anthropic `output_config`**: Control output effort (`low`, `medium`, `high`, `max`) and structured output format
+* **Anthropic `metadata`**: Pass request metadata (user_id, etc.)
+* **Google `thinking_level`**: Control thinking token budget (`minimal`, `low`, `medium`, `high`)
+* **`max_tokens` auto-conversion**: Automatically converts `max_tokens` to `max_completion_tokens` for GPT-5.x and o-series models that require it
+
+### Tool Creation Helpers
+* **OpenAI Responses API**: 12 helpers — `create_web_search_tool`, `create_file_search_tool`, `create_code_interpreter_tool`, `create_computer_tool`, `create_mcp_tool`, `create_function_tool`, `create_image_generation_tool`, `create_local_shell_tool`, `create_tool_search_tool`, `create_apply_patch_tool`, and more
+* **Anthropic Messages API**: 10 helpers — `create_anthropic_web_search_tool`, `create_anthropic_web_fetch_tool`, `create_anthropic_code_execution_tool`, `create_anthropic_bash_tool`, `create_anthropic_text_editor_tool`, `create_anthropic_computer_use_tool`, `create_anthropic_memory_tool`, `create_anthropic_tool_search_bm25_tool`, `create_anthropic_tool_search_regex_tool`, `create_anthropic_function_tool`
+
+### Deprecation Handling
+* **Anthropic deprecated models**: Claude 3.5, 3.7, and 3-Opus models now emit `DeprecationWarning` at construction with replacement suggestions
+* **Clear 404 errors**: Retired models return `ALEAModelError` with "deprecated, use X instead" message instead of generic HTTP errors
+* **`DEPRECATED_MODEL_REPLACEMENTS` mapping**: Programmatic access via `is_deprecated()` and `get_model_replacement()`
+
+### Response Handling Improvements
+* **OpenAI Responses API**: Handle new tool output types — `web_search_call`, `file_search_call`, `code_interpreter_call`, `computer_call`, `mcp_call`, `image_generation_call`, `local_shell_call`, `function_call`
+* **Anthropic `service_tier`**: Extracted from response into `metadata["service_tier"]`
+* **Google thinking tokens**: Extract `thoughtsTokenCount` from usage into `ModelResponse.reasoning_tokens`
+* **Google empty parts fix**: Handle candidates with empty parts without crashing
+* **xAI error parsing**: Fix `_extract_error_message` to handle xAI's string error format (`{"error": "string"}`) vs OpenAI's nested format
+
+### Updated Defaults
+* **OpenAI**: `gpt-5.4` (was `gpt-5-chat-latest`)
+* **Anthropic**: `claude-sonnet-4-6` (was `claude-sonnet-4-20250514`)
+* **Google**: `gemini-3.1-pro-preview` (was `gemini-2.0-flash-exp`)
+* **xAI**: `grok-4-fast-non-reasoning` (was `grok-2-1212`)
+
+### Testing
+* **196 integration tests** across all providers, 71% code coverage
+* **49 OpenAI tests**, **57 Anthropic tests**, **24 Google tests**, **22 Grok tests**, **10 model capability tests**, **10 model registry tests**, **24 grammar tests**
+* All tests use real API calls with rate limiting — no mocks
+
+### Bug Fixes
+* **Google `gemini-2.0-flash-exp` retired**: Updated default and fixture models
+* **Grok `grok-2-1212` retired**: Updated default model
+* **Anthropic Claude 3.5/3.7 retired**: Added deprecation warnings and clear error messages
+* **xAI error parsing crash**: Fixed `'str' object has no attribute 'get'` when xAI returns string errors
+* **Model spec corrections**: Fixed context windows and max output tokens based on web search verification (GPT-5.4: 1.05M/128K, Claude Opus 4.6: 1M/128K, GPT-5.2: 400K/128K)
+
 ## Version 0.2.3
 
 ### Architecture & Performance Improvements
