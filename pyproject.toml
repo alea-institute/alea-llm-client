@@ -1,6 +1,6 @@
 [project]
 name = "alea-llm-client"
-version = "0.3.0"
+version = "0.3.1"
 description = "ALEA LLM client abstraction library for Python"
 authors = [{ name = "ALEA Institute", email = "hello@aleainstitute.ai" }]
 requires-python = ">=3.9,<4.0.0"

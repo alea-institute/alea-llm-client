@@ -60,6 +60,31 @@ efficient = filter_models(
 comparison = compare_models(["gpt-5.4", "claude-sonnet-4-6", "gemini-3.1-pro-preview"])
 ```
 
+### Provider-Agnostic Helper
+
+Use `get_llm_kwargs` to write provider-independent code:
+
+```python
+from alea_llm_client import OpenAIModel, AnthropicModel, get_llm_kwargs
+
+# Works with any provider — translates effort/tier to provider-specific params
+model = OpenAIModel()
+kwargs = get_llm_kwargs(model, effort="low", tier="flex")
+response = model.chat(messages=[{"role": "user", "content": "Hello"}], **kwargs)
+# Sends: reasoning_effort="none", service_tier="flex"
+
+model = AnthropicModel()
+kwargs = get_llm_kwargs(model, effort="low")
+response = model.chat(messages=[{"role": "user", "content": "Hello"}], **kwargs)
+# Sends: output_config={"effort": "low"}
+```
+
+| `effort` | OpenAI | Anthropic | Google |
+|---|---|---|---|
+| `"low"` | `reasoning_effort="none"` | `output_config={"effort": "low"}` | `thinking_level="minimal"` |
+| `"medium"` | `reasoning_effort="medium"` | `output_config={"effort": "medium"}` | `thinking_level="medium"` |
+| `"high"` | `reasoning_effort="high"` | `output_config={"effort": "high"}` | `thinking_level="high"` |
+
 ### Advanced Features
 
 #### Service Tier & Reasoning Control (OpenAI)

@@ -46,6 +46,12 @@ from .llms.utils.json import (
     replace_jsons_refs_with_enum,
 )
 
+# Provider-agnostic helpers
+from .llms.utils.provider_kwargs import (
+    detect_provider,
+    get_llm_kwargs,
+)
+
 __all__ = [
     # Logging
     "DEFAULT_LOGGER",
@@ -68,9 +74,12 @@ __all__ = [
     "OpenAIModel",
     "ResponseType",
     "VLLMModel",
+    # Provider-agnostic helpers
+    "detect_provider",
     "format_instructions",
     # Prompt formatting
     "format_prompt",
+    "get_llm_kwargs",
     # JSON utilities
     "normalize_json_response",
     "replace_jsons_refs_with_enum",

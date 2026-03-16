@@ -1,3 +1,16 @@
+## Version 0.3.1
+
+### Provider-Agnostic Kwargs Helper
+* **`get_llm_kwargs(provider, effort, tier)`**: Translates universal `effort` ("low"/"medium"/"high") and `tier` ("flex"/"standard"/"priority") into provider-specific kwargs
+  - OpenAI: maps to `reasoning_effort` + `service_tier`
+  - Anthropic: maps to `output_config.effort` + `service_tier`
+  - Google: maps to `thinking_level`
+  - xAI/Grok: maps to `reasoning_effort` (same as OpenAI)
+  - VLLM/unknown: returns empty dict (no-op)
+* **`detect_provider(model)`**: Auto-detects provider from model instance or string
+* Accepts model instances or string provider names
+* 29 tests (26 unit + 3 integration)
+
 ## Version 0.3.0
 
 ### New Models
