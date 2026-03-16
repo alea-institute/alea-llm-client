@@ -43,7 +43,7 @@ class GoogleModel(BaseAIModel):
 
     def __init__(
         self,
-        model: str = "gemini-2.0-flash-exp",
+        model: str = "gemini-2.5-flash",
         endpoint: str = "https://generativelanguage.googleapis.com",
         api_key: Optional[str] = None,
         formatter: Optional[Callable[[str], str]] = None,
@@ -247,6 +247,19 @@ class GoogleModel(BaseAIModel):
         if "system" in kwargs:
             kwargs["systemInstruction"] = {"parts": [{"text": kwargs.pop("system")}]}
 
+        # Handle thinking_level parameter (Gemini 2.5+ / 3.x models)
+        if "thinking_level" in kwargs:
+            level = kwargs.pop("thinking_level")
+            if level in ["minimal", "low", "medium", "high"]:
+                gen_config = kwargs.get("generationConfig", {})
+                gen_config["thinkingConfig"] = {
+                    "thinkingBudget": {"minimal": 128, "low": 1024, "medium": 8192, "high": 32768}[level]
+                }
+                kwargs["generationConfig"] = gen_config
+                self.logger.debug(f"Using thinking_level: {level}")
+            else:
+                raise ValueError(f"Invalid thinking_level '{level}'. Must be one of: minimal, low, medium, high")
+
         # pop headers from kwargs
         headers = kwargs.pop("headers", {})
 
@@ -285,7 +298,7 @@ class GoogleModel(BaseAIModel):
 
             # check for 404
             if response.status_code == 404:
-                raise ALEAModelError(f"Model not found: {response.json()}")
+                raise ALEAModelError(f"Model not found: {self.model}")
 
             response.raise_for_status()
             return response
@@ -317,6 +330,19 @@ class GoogleModel(BaseAIModel):
         # Google uses "systemInstruction" instead of "system"
         if "system" in kwargs:
             kwargs["systemInstruction"] = {"parts": [{"text": kwargs.pop("system")}]}
+
+        # Handle thinking_level parameter (Gemini 2.5+ / 3.x models)
+        if "thinking_level" in kwargs:
+            level = kwargs.pop("thinking_level")
+            if level in ["minimal", "low", "medium", "high"]:
+                gen_config = kwargs.get("generationConfig", {})
+                gen_config["thinkingConfig"] = {
+                    "thinkingBudget": {"minimal": 128, "low": 1024, "medium": 8192, "high": 32768}[level]
+                }
+                kwargs["generationConfig"] = gen_config
+                self.logger.debug(f"Using thinking_level: {level}")
+            else:
+                raise ValueError(f"Invalid thinking_level '{level}'. Must be one of: minimal, low, medium, high")
 
         # pop headers from kwargs
         headers = kwargs.pop("headers", {})
@@ -356,7 +382,7 @@ class GoogleModel(BaseAIModel):
 
             # check for 404
             if response.status_code == 404:
-                raise ALEAModelError(f"Model not found: {response.json()}")
+                raise ALEAModelError(f"Model not found: {self.model}")
 
             response.raise_for_status()
             return response
@@ -484,13 +510,19 @@ class GoogleModel(BaseAIModel):
         self.logger.debug("Handling chat response")
         response_data = response.json()
         choices = self._get_chat_choices(response_data)
+
+        # Extract usage and thinking tokens
+        usage = response_data.get("usageMetadata", {})
+        reasoning_tokens = usage.get("thoughtsTokenCount")
+
         model_response = ModelResponse(
             choices=choices,
             metadata={
                 "model": self.model,
-                "usage": response_data.get("usageMetadata", {}),
+                "usage": usage,
             },
             text=choices[0] if len(choices) > 0 else "",
+            reasoning_tokens=reasoning_tokens,
         )
         self.logger.debug(f"Model response: {model_response}")
         return model_response

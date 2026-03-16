@@ -2085,12 +2085,75 @@
             "json"
           ],
           "pricing_tier": "premium"
+        },
+        "gemini-2.5-flash-lite": {
+          "family": "gemini-2.5",
+          "tier": "flash",
+          "status": "ga",
+          "context_window": 1000000,
+          "max_output_tokens": 8192,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "low"
+        },
+        "gemini-3-flash-preview": {
+          "family": "gemini-3",
+          "tier": "flash",
+          "status": "preview",
+          "context_window": 1000000,
+          "max_output_tokens": 8192,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "low"
+        },
+        "gemini-3-pro-preview": {
+          "family": "gemini-3",
+          "tier": "pro",
+          "status": "preview",
+          "context_window": 2000000,
+          "max_output_tokens": 8192,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "high"
+        },
+        "gemini-3.1-pro-preview": {
+          "family": "gemini-3",
+          "tier": "pro",
+          "status": "preview",
+          "context_window": 2000000,
+          "max_output_tokens": 8192,
+          "supports_tools": true,
+          "supports_vision": true,
+          "supports_streaming": true,
+          "supports_thinking": true,
+          "output_formats": [
+            "text",
+            "json"
+          ],
+          "pricing_tier": "high"
         }
       },
       "defaults": {
-        "chat": "gemini-2.0-flash-exp",
+        "chat": "gemini-2.5-flash",
         "reasoning": "gemini-2.5-pro",
-        "fast": "gemini-1.5-flash"
+        "fast": "gemini-2.5-flash-lite"
       }
     },
     "xai": {

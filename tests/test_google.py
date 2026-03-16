@@ -276,3 +276,89 @@ def test_unset_api_key():
             temp_path.rename(key_path)
         os.environ["GOOGLE_API_KEY"] = original_google_key
         os.environ["VERTEX_API_KEY"] = original_vertex_key
+
+
+# ========== New model tests ==========
+
+
+def test_gemini_3_flash_preview():
+    """Test Gemini 3 Flash Preview model."""
+    model = GoogleModel(model="gemini-3-flash-preview")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 4 + 5?"}],
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "9" in response.text
+
+
+def test_gemini_3_pro_preview():
+    """Test Gemini 3 Pro Preview model."""
+    model = GoogleModel(model="gemini-3-pro-preview")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 6 * 7?"}],
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "42" in response.text
+
+
+def test_gemini_3_1_pro_preview():
+    """Test Gemini 3.1 Pro Preview model."""
+    model = GoogleModel(model="gemini-3.1-pro-preview")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 12 - 5?"}],
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "7" in response.text
+
+
+def test_gemini_2_5_flash_lite():
+    """Test Gemini 2.5 Flash Lite model."""
+    model = GoogleModel(model="gemini-2.5-flash-lite")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 3 + 3?"}],
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "6" in response.text
+
+
+def test_thinking_level():
+    """Test thinking_level parameter with Gemini 2.5 Flash."""
+    model = GoogleModel(model="gemini-2.5-flash")
+    response: ModelResponse = model.chat(
+        messages=[{"role": "user", "content": "What is 13 * 17?"}],
+        thinking_level="medium",
+    )
+    assert isinstance(response, ModelResponse)
+    assert response.text is not None
+    assert "221" in response.text
+
+    # Should have thinking/reasoning tokens
+    if response.reasoning_tokens:
+        assert response.reasoning_tokens > 0
+        print(f"Thinking tokens used: {response.reasoning_tokens}")
+
+
+def test_thinking_level_invalid():
+    """Test that invalid thinking_level raises ValueError."""
+    from alea_llm_client.core.exceptions import ALEARetryExhaustedError
+
+    model = GoogleModel(model="gemini-2.5-flash")
+    with pytest.raises(ALEARetryExhaustedError):
+        model.chat(
+            messages=[{"role": "user", "content": "Test"}],
+            thinking_level="invalid",
+        )
+
+
+def test_deprecated_model_404():
+    """Test that retired models give a clear 404 error."""
+    from alea_llm_client.core.exceptions import ALEAModelError
+
+    model = GoogleModel(model="gemini-2.0-flash-exp")
+    with pytest.raises(ALEAModelError) as exc_info:
+        model.chat(messages=[{"role": "user", "content": "Test"}])
+    assert "not found" in str(exc_info.value).lower()
