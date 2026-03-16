@@ -136,9 +136,9 @@ def test_is_model_deprecated():
 def test_default_models():
     """Test default model selection."""
     assert DEFAULT_MODELS["openai"] == "gpt-5-chat-latest"
-    assert DEFAULT_MODELS["anthropic"] == "claude-sonnet-4-20250514"
-    assert DEFAULT_MODELS["google"] == "gemini-2.0-flash-exp"
-    assert DEFAULT_MODELS["xai"] == "grok-2-1212"
+    assert DEFAULT_MODELS["anthropic"] == "claude-sonnet-4-6"
+    assert DEFAULT_MODELS["google"] == "gemini-2.5-flash"
+    assert DEFAULT_MODELS["xai"] == "grok-3"
 
 
 def test_model_sizes():

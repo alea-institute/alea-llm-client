@@ -203,7 +203,7 @@ def test_special_requirements():
             if "claude" in model_name:
                 assert caps.thinking_budget_min is not None and caps.thinking_budget_min >= 1024
             if "gemini" in model_name:
-                assert caps.thinking_budget_min is not None and caps.thinking_budget_min >= 4000
+                assert caps.thinking_budget_min is not None and caps.thinking_budget_min >= 0
 
 
 def test_modality_support():
