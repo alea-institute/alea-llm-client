@@ -1568,9 +1568,9 @@
         }
       },
       "defaults": {
-        "chat": "gpt-5-chat-latest",
-        "reasoning": "o3-mini",
-        "fast": "gpt-5-nano"
+        "chat": "gpt-5.4",
+        "reasoning": "o4-mini",
+        "fast": "gpt-5.1-mini"
       }
     },
     "anthropic": {

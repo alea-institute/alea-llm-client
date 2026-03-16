@@ -271,10 +271,10 @@ def _get_dynamic_anthropic_defaults() -> dict[str, str]:
         if "anthropic" in providers:
             defaults = providers["anthropic"].defaults
             return {
-                "chat": defaults.get("chat", "claude-sonnet-4-20250514"),
-                "reasoning": defaults.get("reasoning", "claude-opus-4-20250514"),
-                "fast": defaults.get("fast", "claude-3-5-haiku-latest"),
-                "thinking": defaults.get("thinking", "claude-sonnet-4-20250514"),
+                "chat": defaults.get("chat", "claude-sonnet-4-6"),
+                "reasoning": defaults.get("reasoning", "claude-opus-4-6"),
+                "fast": defaults.get("fast", "claude-haiku-4-5"),
+                "thinking": defaults.get("thinking", "claude-sonnet-4-6"),
             }
     except Exception as e:
         logger.warning(f"Failed to load dynamic Anthropic defaults: {e}")

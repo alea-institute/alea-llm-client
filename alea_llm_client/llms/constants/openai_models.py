@@ -231,18 +231,18 @@ def _get_dynamic_defaults() -> dict[str, str]:
         if "openai" in providers:
             defaults = providers["openai"].defaults
             return {
-                "chat": defaults.get("chat", "gpt-5-chat-latest"),
-                "reasoning": defaults.get("reasoning", "o3-mini"),
-                "fast": defaults.get("fast", "gpt-5-nano"),
+                "chat": defaults.get("chat", "gpt-5.4"),
+                "reasoning": defaults.get("reasoning", "o4-mini"),
+                "fast": defaults.get("fast", "gpt-5.1-mini"),
             }
     except Exception as e:
         logger.warning(f"Failed to load dynamic defaults: {e}")
 
     # Fallback to static defaults
     return {
-        "chat": "gpt-5-chat-latest",
-        "reasoning": "o3-mini",
-        "fast": "gpt-5-nano",
+        "chat": "gpt-5.4",
+        "reasoning": "o4-mini",
+        "fast": "gpt-5.1-mini",
     }
 
 
