@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: (MIT)
-__version__ = "0.2.3"
+__version__ = "0.3.4"
 __author__ = "ALEA Institute (https://aleainstitute.ai)"
 __license__ = "MIT"
 __copyright__ = "Copyright 2024-2025, ALEA Institute"
