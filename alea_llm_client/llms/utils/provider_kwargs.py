@@ -21,7 +21,13 @@ Usage:
     kwargs["reasoning_effort"] = "xhigh"  # power user override
 """
 
-from typing import Any, Optional, Union
+from __future__ import annotations
+
+import re
+from typing import Any
+
+# "gpt-5.4", "gpt-6.1-terra", "gpt-7" -> major version; not "gpt-4o", "gpt-oss-120b".
+_GPT_MAJOR_RE = re.compile(r"^gpt-(\d+)(?:[.-]|$)")
 
 
 def _get_model_name(model: Any) -> str | None:
@@ -31,20 +37,42 @@ def _get_model_name(model: Any) -> str | None:
     return None
 
 
+def _gpt_major(model_name: str | None) -> int | None:
+    """Major version of a "gpt-<N>..." model name, or None for other names."""
+    if model_name is None:
+        return None
+    match = _GPT_MAJOR_RE.match(model_name)
+    return int(match.group(1)) if match else None
+
+
 def _openai_supports_effort(model_name: str | None) -> bool:
     """Check if an OpenAI model supports reasoning_effort in Chat API."""
-    if model_name is None:
-        return False
-    # GPT-5.x models support reasoning_effort in Chat Completions API
-    return model_name.startswith("gpt-5")
+    # GPT-5 and later support reasoning_effort in Chat Completions API
+    major = _gpt_major(model_name)
+    return major is not None and major >= 5
 
 
 def _openai_supports_tier(model_name: str | None) -> bool:
     """Check if an OpenAI model supports service_tier."""
     if model_name is None:
         return False
-    # GPT-5.x and o-series support service_tier
-    return model_name.startswith(("gpt-5", "o1", "o3", "o4"))
+    # GPT-5 and later, and the o-series, support service_tier
+    major = _gpt_major(model_name)
+    return (major is not None and major >= 5) or model_name.startswith(("o1", "o3", "o4"))
+
+
+def _openai_effort_value(effort: str, model_name: str | None) -> str:
+    """Map a universal effort level to an OpenAI reasoning_effort value.
+
+    "low" is the lowest level every model accepts: "none" on GPT-5.x, but
+    "low" on GPT-6 and later, where some models (gpt-6.1-sol, gpt-6-astra)
+    reject "none" with a 400 while every one accepts "low".
+    """
+    if effort == "low":
+        major = _gpt_major(model_name)
+        if major is not None and major >= 6:
+            return "low"
+    return _EFFORT_OPENAI[effort]
 
 
 def _anthropic_supports_effort(model_name: str | None) -> bool:
@@ -102,9 +130,9 @@ def detect_provider(model: Any) -> str:
 
 
 def get_llm_kwargs(
-    provider: Union[str, Any],
-    effort: Optional[str] = None,
-    tier: Optional[str] = None,
+    provider: str | Any,
+    effort: str | None = None,
+    tier: str | None = None,
 ) -> dict[str, Any]:
     """Build provider-appropriate kwargs from universal settings.
 
@@ -157,7 +185,7 @@ def get_llm_kwargs(
 
     if provider_name in ("openai", "xai"):
         if effort is not None and _openai_supports_effort(model_name):
-            kwargs["reasoning_effort"] = _EFFORT_OPENAI[effort]
+            kwargs["reasoning_effort"] = _openai_effort_value(effort, model_name)
         if tier is not None and _openai_supports_tier(model_name):
             kwargs["service_tier"] = _TIER_OPENAI[tier]
 

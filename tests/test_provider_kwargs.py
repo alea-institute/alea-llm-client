@@ -60,6 +60,35 @@ def test_openai_gpt5_effort_and_tier():
     assert kwargs == {"reasoning_effort": "none", "service_tier": "flex"}
 
 
+# ========== Model-aware: OpenAI GPT-6.x and later ==========
+# Live API check (2026-11-09): every gpt-6 model accepts reasoning_effort "low"
+# and service_tier "flex", but gpt-6.1-sol and gpt-6-astra reject "none".
+
+
+@pytest.mark.parametrize("name", ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra", "gpt-7"])
+def test_openai_gpt6_plus_effort_low_maps_to_low(name):
+    model = OpenAIModel(model=name)
+    assert get_llm_kwargs(model, effort="low") == {"reasoning_effort": "low"}
+
+
+@pytest.mark.parametrize("name", ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol"])
+def test_openai_gpt6_plus_effort_and_tier(name):
+    model = OpenAIModel(model=name)
+    kwargs = get_llm_kwargs(model, effort="high", tier="flex")
+    assert kwargs == {"reasoning_effort": "high", "service_tier": "flex"}
+
+
+def test_openai_gpt5_family_still_maps_low_to_none():
+    model = OpenAIModel(model="gpt-5.6-terra")
+    assert get_llm_kwargs(model, effort="low") == {"reasoning_effort": "none"}
+
+
+@pytest.mark.parametrize("name", ["gpt-4.1-mini", "gpt-4o", "gpt-60x-unknown", "gpt-oss-120b"])
+def test_openai_non_reasoning_names_stay_noop(name):
+    model = OpenAIModel(model=name)
+    assert get_llm_kwargs(model, effort="low", tier="flex") == {}
+
+
 # ========== Model-aware: OpenAI GPT-4.x (no effort, no tier) ==========
 
 
@@ -249,6 +278,23 @@ def test_openai_gpt4_integration():
     model = OpenAIModel(model="gpt-4.1-mini")
     kwargs = get_llm_kwargs(model, effort="low", tier="flex")
     assert kwargs == {}
+    response = model.chat(
+        messages=[{"role": "user", "content": "Say OK"}],
+        **kwargs,
+    )
+    assert response.text is not None
+
+
+@pytest.mark.parametrize("name", ["gpt-6.1-terra", "gpt-6.1-sol"])
+def test_openai_gpt6_integration(name):
+    """GPT-6 with effort/tier: params are sent and accepted by the real API.
+
+    gpt-6.1-sol answers 400 to reasoning_effort "none", so this also guards
+    the low -> "low" mapping for GPT-6 and later.
+    """
+    model = OpenAIModel(model=name)
+    kwargs = get_llm_kwargs(model, effort="low", tier="flex")
+    assert kwargs == {"reasoning_effort": "low", "service_tier": "flex"}
     response = model.chat(
         messages=[{"role": "user", "content": "Say OK"}],
         **kwargs,
